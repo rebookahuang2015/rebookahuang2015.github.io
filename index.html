@@ -1,0 +1,4132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gesture Symphony — Two-Player Collaborative Chord Synthesizer</title>
+  <meta name="description" content="Real-time multi-person collaborative hand gesture to musical chord synthesizer using MediaPipe and Tone.js">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ============================================================
+       STYLE SYSTEM
+       ============================================================ */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #0a0a0a;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #fff;
+      -webkit-font-smoothing: antialiased;
+    }
+    video { display: none !important; }
+    canvas#canvas {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 0;
+    }
+
+    /* ---- PANEL HEADER ---- */
+    .panel-header {
+      font-size: 9px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; margin-bottom: 8px; text-align: center;
+    }
+    .left-panel.p1 .panel-header, .right-panel.p1 .panel-header { color: rgba(0, 255, 136, 0.75); }
+    .left-panel.p2 .panel-header, .right-panel.p2 .panel-header { color: rgba(255, 110, 199, 0.75); }
+
+    /* ---- LEFT PANEL ---- */
+    .left-panel {
+      position: fixed; top: 52%; transform: translateY(-50%);
+      z-index: 10;
+      display: flex; flex-direction: column; align-items: center;
+      animation: fadeUp 0.6s ease-out both;
+    }
+    .left-panel.p1 { left: 16px; }
+    .left-panel.p2 { right: 16px; }
+
+    .gesture-list { display: flex; flex-direction: column; gap: 4px; }
+    .gesture-card {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 14px; min-width: 120px;
+      background: rgba(18,18,24,0.65);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px; cursor: default;
+      transition: all 0.25s cubic-bezier(.25,.46,.45,.94);
+      position: relative;
+    }
+    .gesture-card::before {
+      content:''; position: absolute; inset: 0; border-radius: 10px;
+      background: linear-gradient(135deg,rgba(255,255,255,0.03) 0%,transparent 50%);
+      pointer-events: none;
+    }
+    
+    .left-panel.p1 .gesture-card.active {
+      background: rgba(0, 255, 136, 0.12);
+      border-color: #00ff88;
+      box-shadow: 0 0 16px rgba(0, 255, 136, 0.25), inset 0 0 16px rgba(0, 255, 136, 0.05);
+      transform: scale(1.03);
+    }
+    .left-panel.p1 .gesture-card.active .gesture-label {
+      color: #00ff88;
+      text-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+    }
+
+    .left-panel.p2 .gesture-card.active {
+      background: rgba(255, 110, 199, 0.12);
+      border-color: #ff6ec7;
+      box-shadow: 0 0 16px rgba(255, 110, 199, 0.25), inset 0 0 16px rgba(255, 110, 199, 0.05);
+      transform: scale(1.03);
+    }
+    .left-panel.p2 .gesture-card.active .gesture-label {
+      color: #ff6ec7;
+      text-shadow: 0 0 8px rgba(255, 110, 199, 0.3);
+    }
+
+    .gesture-card.stop { border-color: rgba(200,60,60,0.15); }
+    .gesture-card.stop.active {
+      border-color: rgba(255,80,80,0.5) !important;
+      box-shadow: 0 0 16px rgba(255,80,80,0.15), inset 0 0 16px rgba(255,80,80,0.05) !important;
+    }
+    .gesture-card.stop .gesture-label { color: rgba(255,120,120,0.55); }
+    .gesture-card.stop.active .gesture-label { color: rgba(255,100,100,1) !important; text-shadow: 0 0 8px rgba(255,80,80,0.4) !important; }
+    
+    .gesture-emoji { font-size: 18px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)); }
+    .gesture-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.45); transition: all 0.25s ease; }
+
+    /* ---- RIGHT PANEL — ORBITAL ---- */
+    .right-panel {
+      position: fixed; top: 52%; transform: translateY(-50%);
+      z-index: 10;
+      display: flex; flex-direction: column; align-items: center;
+      animation: fadeUp 0.6s ease-out both;
+    }
+    .right-panel.p1 { left: calc(25vw - 180px); }
+    .right-panel.p2 { left: calc(75vw - 180px); }
+
+    .orbital-container {
+      position: relative; width: 360px; height: 360px;
+    }
+    .orbital-center {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      width: 84px; height: 84px; border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,0.07);
+      background: rgba(18,18,24,0.4);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 300; color: rgba(255,255,255,0.22); letter-spacing: 1px;
+    }
+    
+    .orbital-node {
+      position: absolute; width: 75px; height: 75px; border-radius: 50%;
+      background: rgba(22,22,30,0.6);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.06);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(.25,.46,.45,.94);
+      top: 50%; left: 50%;
+      --radius: 142px;
+      transform: translate(-50%,-50%) rotate(var(--angle)) translateY(calc(-1 * var(--radius))) rotate(calc(-1 * var(--angle)));
+    }
+    
+    .right-panel.p1 .orbital-node.active {
+      background: rgba(0, 255, 136, 0.15);
+      border-color: #00ff88;
+      box-shadow: 0 0 16px rgba(0, 255, 136, 0.3), 0 0 32px rgba(0, 255, 136, 0.15);
+      transform: translate(-50%,-50%) rotate(var(--angle)) translateY(calc(-1 * var(--radius))) rotate(calc(-1 * var(--angle))) scale(1.12);
+    }
+    
+    .right-panel.p2 .orbital-node.active {
+      background: rgba(255, 110, 199, 0.15);
+      border-color: #ff6ec7;
+      box-shadow: 0 0 16px rgba(255, 110, 199, 0.3), 0 0 32px rgba(255, 110, 199, 0.15);
+      transform: translate(-50%,-50%) rotate(var(--angle)) translateY(calc(-1 * var(--radius))) rotate(calc(-1 * var(--angle))) scale(1.12);
+    }
+
+    .node-emoji { font-size: 22px; line-height: 1.1; }
+    .node-label {
+      font-size: 12px; font-weight: 600;
+      color: rgba(255, 255, 255, 0.7);
+      margin-top: 2px;
+    }
+
+    /* ---- HUD Panels ---- */
+    .hud-panel {
+      position: fixed; top: 70px; z-index: 10;
+      padding: 12px 18px; border-radius: 12px;
+      background: rgba(18,18,24,0.65); border: 1px solid rgba(255,255,255,0.06);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      min-width: 220px;
+    }
+    .hud-panel.p1 { left: 20px; border-left: 4px solid #00ff88; }
+    .hud-panel.p2 { right: 20px; border-right: 4px solid #ff6ec7; text-align: right; }
+
+    .hud-header {
+      font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+      color: rgba(255,255,255,0.4); text-transform: uppercase; margin-bottom: 4px;
+    }
+    .hud-chord {
+      font-size: 28px; font-weight: 700; margin-bottom: 8px;
+    }
+    .hud-panel.p1 .hud-chord { color: #00ff88; text-shadow: 0 0 10px rgba(0,255,136,0.3); }
+    .hud-panel.p2 .hud-chord { color: #ff6ec7; text-shadow: 0 0 10px rgba(255,110,199,0.3); }
+
+    .hud-bar-container {
+      width: 100%; height: 6px; background: rgba(255,255,255,0.08);
+      border-radius: 3px; overflow: hidden; margin-bottom: 6px;
+    }
+    .hud-bar {
+      height: 100%; width: 0%; transition: width 0.1s ease;
+    }
+    .hud-panel.p1 .hud-bar { background: #00ff88; }
+    .hud-panel.p2 .hud-bar { background: #ff6ec7; float: right; }
+
+    .hud-fingers {
+      font-size: 11px; font-family: monospace; color: rgba(255,255,255,0.5);
+    }
+
+    /* ---- Chord Displays ---- */
+    .chord-label {
+      position: fixed; bottom: 85px; font-size: 64px; font-weight: 700;
+      letter-spacing: -1px; pointer-events: none; user-select: none;
+      transition: all 0.4s cubic-bezier(.25,.46,.45,.94);
+    }
+    .chord-label.p1 { left: 80px; color: #00ff88; text-shadow: 0 0 25px rgba(0,255,136,0.45); }
+    .chord-label.p2 { right: 80px; color: #ff6ec7; text-shadow: 0 0 25px rgba(255,110,199,0.45); }
+
+    .harmony-label {
+      position: fixed; bottom: 95px; left: 50%; transform: translateX(-50%);
+      font-size: 28px; font-weight: 600; color: #fff;
+      text-shadow: 0 0 15px rgba(255,255,255,0.8), 0 0 30px rgba(210,180,255,0.4);
+      pointer-events: none; opacity: 0; transition: opacity 0.3s ease;
+      z-index: 15;
+    }
+    .harmony-label.active { opacity: 1; animation: floatTxt 2s ease-in-out infinite; }
+
+    /* ---- Session Scoreboard ---- */
+    #scoreboard {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      z-index: 10; font-size: 11px; font-weight: 600; letter-spacing: 1px;
+      color: rgba(255,255,255,0.4); text-transform: uppercase;
+      background: rgba(18,18,24,0.6); border: 1px solid rgba(255,255,255,0.06);
+      padding: 6px 16px; border-radius: 20px; backdrop-filter: blur(8px);
+    }
+
+    /* ---- Mode Selector Floating Header ---- */
+    #mode-selector-container {
+      position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+      z-index: 30;
+      display: flex; gap: 8px;
+      padding: 6px;
+      background: rgba(14,14,22,0.72);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+    .mode-btn {
+      padding: 8px 18px;
+      background: none; border: none;
+      border-radius: 14px;
+      color: rgba(255,255,255,0.5);
+      font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .mode-btn:hover {
+      color: #fff;
+    }
+    .mode-btn.active {
+      background: rgba(255, 255, 255, 0.08);
+      color: #00ff88;
+      box-shadow: 0 0 12px rgba(0, 255, 136, 0.25);
+    }
+    .mode-btn.active#btn-mode-duo {
+      color: #ff6ec7;
+      box-shadow: 0 0 12px rgba(255, 110, 199, 0.25);
+    }
+
+    /* ---- Sound Controls Tabs ---- */
+    .sc-tabs {
+      display: flex;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.01);
+    }
+    .sc-tab-btn {
+      flex: 1;
+      padding: 10px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: rgba(255, 255, 255, 0.45);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .sc-tab-btn:hover {
+      color: #fff;
+    }
+    .sc-tab-btn.active {
+      color: #fff;
+      border-bottom-color: #00ff88;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .sc-tab-btn#sc-tab-p2.active {
+      border-bottom-color: #ff6ec7;
+    }
+
+    /* ---- Single Player Layout Adjustments ---- */
+    body.mode-single #p2-left-panel,
+    body.mode-single #p2-right-panel,
+    body.mode-single #p2-hud {
+      display: none !important;
+    }
+    body.mode-single #p1-right-panel {
+      left: calc(100vw - 440px);
+    }
+    body.mode-single #p1-hud {
+      left: 50%;
+      transform: translateX(-50%);
+      width: 320px;
+    }
+
+    /* ---- Single Player — Figma-Inspired Overhaul ---- */
+    body.mode-single {
+      --accent-hue: 145;
+      --accent-color: hsl(var(--accent-hue), 60%, 68%);
+      --accent-neon: hsl(var(--accent-hue), 95%, 74%);
+    }
+
+    /* Ambient background glows */
+    #single-ambient-bg {
+      position: fixed; inset: 0; pointer-events: none; z-index: -1;
+      display: none;
+    }
+    body.mode-single #single-ambient-bg { display: block; }
+
+    .amb-center-glow {
+      position: absolute; width: 620px; height: 620px;
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: radial-gradient(circle, hsla(var(--accent-hue), 60%, 68%, 0.12), transparent 68%);
+      filter: blur(60px);
+      transition: background 1.2s ease;
+    }
+    .amb-nebula {
+      position: absolute; border-radius: 50%;
+      filter: blur(46px);
+    }
+    .amb-nebula.top-right {
+      width: 300px; height: 300px; top: 12%; right: 16%;
+      background: radial-gradient(circle, hsla(210, 30%, 40%, 0.1), transparent 70%);
+    }
+    .amb-nebula.bot-left {
+      width: 260px; height: 260px; bottom: 10%; left: 14%;
+      background: radial-gradient(circle, hsla(45, 25%, 36%, 0.08), transparent 70%);
+    }
+
+    /* Single-player top header */
+    #single-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 12;
+      display: none; align-items: center; justify-content: center;
+      padding: 20px 0;
+    }
+    body.mode-single #single-header { display: flex; }
+    #single-header .header-line {
+      width: 48px; height: 1px; background: rgba(255,255,255,0.1);
+    }
+    #single-header .header-label {
+      font-size: 10px; letter-spacing: 0.35em; text-transform: uppercase;
+      color: rgba(255,255,255,0.25); margin: 0 16px;
+      font-family: 'Inter', monospace;
+    }
+
+    /* Center chord glyph container */
+    #chord-glyph-container {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -55%);
+      width: 320px; height: 320px;
+      z-index: 1; pointer-events: none;
+      display: none;
+    }
+    body.mode-single #chord-glyph-container { display: block; }
+    #chord-glyph-container svg {
+      width: 100%; height: 100%;
+      transition: color 1s ease;
+    }
+    #chord-glyph-container .glyph-bloom {
+      position: absolute; inset: -40px; border-radius: 50%;
+      background: radial-gradient(circle, hsla(var(--accent-hue), 60%, 68%, 0.18), transparent 65%);
+      animation: glyphBreathe 4.5s ease-in-out infinite;
+      transition: background 1.2s ease;
+    }
+
+    /* Chord name display below glyph */
+    #chord-name-display {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, 110px);
+      z-index: 2; pointer-events: none;
+      text-align: center; display: none;
+    }
+    body.mode-single #chord-name-display { display: block; }
+    #chord-name-display .chord-text {
+      font-size: 20px; letter-spacing: 0.15em;
+      color: rgba(255,255,255,0.92); font-weight: 300;
+      font-family: 'Inter', monospace;
+      transition: opacity 0.5s ease;
+    }
+    #chord-name-display .chord-quality {
+      font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--accent-color, hsl(145, 60%, 68%));
+      opacity: 0.75; margin-top: 6px;
+      font-family: 'Inter', monospace;
+      transition: color 1s ease;
+    }
+
+    /* Single-player bottom hint */
+    #single-bottom-hint {
+      position: fixed; bottom: 20px; left: 0; right: 0;
+      z-index: 12; text-align: center;
+      display: none;
+    }
+    body.mode-single #single-bottom-hint { display: block; }
+    #single-bottom-hint span {
+      font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+      color: rgba(255,255,255,0.12);
+      font-family: 'Inter', monospace;
+    }
+
+    /* Single-player panel refinements */
+    body.mode-single .left-panel.p1 .gesture-card.active {
+      background: hsla(var(--accent-hue), 60%, 68%, 0.14) !important;
+      border-color: var(--accent-color) !important;
+      box-shadow: 0 0 18px hsla(var(--accent-hue), 60%, 68%, 0.2) !important;
+    }
+    body.mode-single .left-panel.p1 .gesture-card.active .gesture-label {
+      color: var(--accent-color) !important;
+      text-shadow: 0 0 8px hsla(var(--accent-hue), 60%, 68%, 0.3) !important;
+    }
+    body.mode-single .left-panel.p1 .gesture-card.active::after {
+      content: ''; position: absolute; left: 0; top: 50%;
+      transform: translateY(-50%);
+      width: 3px; height: 24px; border-radius: 2px;
+      background: var(--accent-color);
+    }
+    body.mode-single .right-panel.p1 .orbital-node.active {
+      background: hsla(var(--accent-hue), 60%, 68%, 0.18) !important;
+      border-color: var(--accent-color) !important;
+      box-shadow: 0 0 22px hsla(var(--accent-hue), 60%, 68%, 0.25) !important;
+    }
+    body.mode-single .left-panel.p1 .panel-header {
+      color: var(--accent-color) !important;
+      opacity: 0.8;
+      transition: color 1s ease;
+    }
+    body.mode-single .right-panel.p1 .panel-header {
+      color: var(--accent-color) !important;
+      opacity: 0.8;
+      transition: color 1s ease;
+    }
+
+    /* Hide elements in single mode that aren't needed */
+    body.mode-single #p1-hud { display: none !important; }
+    body.mode-single #p1-chord-label { display: none !important; }
+    body.mode-single #scoreboard { display: none !important; }
+    body.mode-single #harmony-label { display: none !important; }
+
+    @keyframes glyphBreathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.035); }
+    }
+    @keyframes glyphEntry {
+      from { transform: scale(0.7); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    #chord-glyph-container .glyph-inner {
+      animation: glyphEntry 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    /* ---- Solo & Accompaniment Mode ---- */
+    body.mode-solo-accomp #p1-left-panel,
+    body.mode-solo-accomp #p1-right-panel,
+    body.mode-solo-accomp #p2-left-panel,
+    body.mode-solo-accomp #p2-right-panel,
+    body.mode-solo-accomp #p1-hud,
+    body.mode-solo-accomp #p2-hud,
+    body.mode-solo-accomp #chord-glyph-container,
+    body.mode-solo-accomp #chord-name-display,
+    body.mode-solo-accomp #single-header,
+    body.mode-solo-accomp #single-bottom-hint,
+    body.mode-solo-accomp #scoreboard,
+    body.mode-solo-accomp #harmony-label,
+    body.mode-solo-accomp #p1-chord-label,
+    body.mode-solo-accomp #p2-chord-label,
+    body.mode-solo-accomp #single-ambient-bg,
+    body.mode-solo-accomp #sound-controls { display: none !important; }
+
+    #solo-accomp-hud {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+      z-index: 20; display: none;
+      padding: 14px 28px 12px; min-width: 380px;
+      background: rgba(10,10,18,0.78);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px; color: #fff;
+      font-family: 'Inter', monospace;
+    }
+    body.mode-solo-accomp #solo-accomp-hud { display: flex; gap: 24px; align-items: center; }
+
+    #solo-accomp-hud .sa-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    #solo-accomp-hud .sa-label {
+      font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase;
+      color: rgba(255,255,255,0.3);
+    }
+    #solo-accomp-hud .sa-value {
+      font-size: 18px; font-weight: 300; letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.9); min-width: 48px; text-align: center;
+    }
+    #solo-accomp-hud .sa-value.sa-note {
+      font-size: 24px; font-weight: 400;
+      color: hsl(var(--sa-hue, 145), 75%, 72%);
+      text-shadow: 0 0 12px hsla(var(--sa-hue, 145), 80%, 60%, 0.3);
+    }
+    #solo-accomp-hud .sa-bar-track {
+      width: 64px; height: 4px; border-radius: 2px;
+      background: rgba(255,255,255,0.08); overflow: hidden;
+    }
+    #solo-accomp-hud .sa-bar-fill {
+      height: 100%; border-radius: 2px;
+      background: hsl(var(--sa-hue, 145), 65%, 60%);
+      transition: width 0.08s ease;
+    }
+    #solo-accomp-hud .sa-articulation {
+      font-size: 11px; font-weight: 500; letter-spacing: 0.15em;
+      text-transform: uppercase; padding: 3px 10px;
+      border-radius: 6px; border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04);
+    }
+    #solo-accomp-hud .sa-articulation.legato { color: #6be89f; border-color: rgba(107,232,159,0.2); }
+    #solo-accomp-hud .sa-articulation.staccato { color: #e8a96b; border-color: rgba(232,169,107,0.2); }
+    #solo-accomp-hud .sa-articulation.pizzicato { color: #e86b8a; border-color: rgba(232,107,138,0.2); }
+
+    /* Solo mode header */
+    #solo-accomp-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 12;
+      display: none; align-items: center; justify-content: center; padding: 20px 0;
+    }
+    body.mode-solo-accomp #solo-accomp-header { display: flex; }
+    #solo-accomp-header .header-line { width: 48px; height: 1px; background: rgba(255,255,255,0.1); }
+    #solo-accomp-header .header-label {
+      font-size: 10px; letter-spacing: 0.35em; text-transform: uppercase;
+      color: rgba(255,255,255,0.25); margin: 0 16px; font-family: 'Inter', monospace;
+    }
+
+    /* Scale selector pills for solo mode */
+    #solo-scale-selector {
+      position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
+      z-index: 15; display: none; gap: 6px;
+    }
+    body.mode-solo-accomp #solo-scale-selector { display: flex; }
+    .sa-scale-btn {
+      font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase;
+      padding: 5px 12px; border-radius: 8px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.4); cursor: pointer;
+      font-family: 'Inter', monospace; transition: all 0.2s ease;
+    }
+    .sa-scale-btn:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); }
+    .sa-scale-btn.active {
+      background: rgba(107,232,159,0.12); border-color: rgba(107,232,159,0.25);
+      color: #6be89f;
+    }
+
+
+    /* ---- Performance warning ---- */
+    .perf-warning {
+      position: fixed; top: 18px; left: 20px;
+      background: rgba(200,60,60,0.85); color: #fff; padding: 6px 12px;
+      border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+      z-index: 100; pointer-events: none;
+    }
+    .perf-warning.hidden { display: none; }
+
+    /* ---- Sound Controls Dashboard ---- */
+    #sound-controls {
+      position: fixed; bottom: 16px; left: 20px;
+      z-index: 20; width: 440px; max-width: calc(100vw - 360px);
+      background: rgba(14,14,22,0.82);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px; overflow: hidden;
+      animation: fadeUp 0.5s ease-out both 0.6s;
+    }
+    .sc-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 12px; font-weight: 600; letter-spacing: 2px;
+      color: rgba(255,255,255,0.6); cursor: grab; user-select: none;
+    }
+    .sc-grip { font-size: 14px; color: rgba(255,255,255,0.2); }
+    .sc-toggle {
+      margin-left: auto; background: none; border: none; color: rgba(255,255,255,0.35);
+      font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1;
+    }
+    .sc-body { padding: 12px 16px; display: flex; flex-direction: column; gap: 14px; }
+    .sc-body.collapsed { display: none; }
+    .sc-section-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+      color: rgba(255,255,255,0.3); margin-bottom: 8px; text-transform: uppercase;
+    }
+    .sc-row { display: flex; gap: 12px; }
+    .sc-timbre-group { display: flex; gap: 8px; width: 100%; }
+    .sc-timbre-btn, .sc-autoplay-btn {
+      flex: 1; padding: 8px 10px;
+      background: rgba(30,30,40,0.6);
+      border: 1px solid rgba(255,255,255,0.06); border-radius: 10px;
+      color: rgba(255,255,255,0.45); font-family: inherit;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: all 0.25s ease; text-align: center; line-height: 1.3;
+    }
+    .sc-timbre-btn small, .sc-autoplay-btn small { font-size: 9px; font-weight: 400; opacity: 0.6; }
+    .sc-timbre-btn.active, .sc-autoplay-btn.active {
+      background: rgba(100,80,180,0.3);
+      border-color: rgba(140,120,220,0.5);
+      color: #fff;
+      box-shadow: 0 0 16px rgba(100,80,180,0.15);
+    }
+    .sc-timbre-btn:hover:not(.active), .sc-autoplay-btn:hover:not(.active) { background: rgba(40,40,55,0.7); border-color: rgba(255,255,255,0.1); }
+
+    /* Sliders */
+    .sc-slider-group { display: flex; flex-direction: column; gap: 4px; width: 50%; }
+    .sc-slider-group label {
+      font-size: 10px; font-weight: 600; letter-spacing: 1px;
+      color: rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: space-between;
+    }
+    .sc-val { font-weight: 400; color: rgba(255,255,255,0.3); }
+    .sc-range {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 6px;
+      background: rgba(255,255,255,0.08); border-radius: 3px;
+      outline: none; cursor: pointer;
+    }
+    .sc-range::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 16px; height: 16px;
+      border-radius: 50%; background: #fff; cursor: grab;
+      box-shadow: 0 0 8px rgba(255,255,255,0.3);
+    }
+    .sc-range.hp::-webkit-slider-thumb { background: #ff6b8a; }
+    .sc-range.lp::-webkit-slider-thumb { background: #6bc5ff; }
+    .sc-range.reverb::-webkit-slider-thumb { background: #c49bff; }
+
+    /* ADSR */
+    .sc-adsr-row { display: flex; align-items: flex-end; gap: 14px; padding-top: 4px; }
+    .sc-adsr-slider { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .sc-adsr-val { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.5); }
+    .sc-range-v {
+      -webkit-appearance: slider-vertical; appearance: slider-vertical;
+      width: 8px; height: 80px;
+      background: rgba(255,255,255,0.08); outline: none; cursor: pointer;
+    }
+    .sc-range-v::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 18px; height: 18px;
+      border-radius: 50%; cursor: grab;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .sc-range-v.adsr-a::-webkit-slider-thumb { background: #c49bff; }
+    .sc-range-v.adsr-d::-webkit-slider-thumb { background: #6bc5ff; }
+    .sc-range-v.adsr-s::-webkit-slider-thumb { background: #4fdbaf; }
+    .sc-range-v.adsr-r::-webkit-slider-thumb { background: #ff6b8a; }
+    
+    .sc-adsr-label {
+      font-size: 12px; font-weight: 700; width: 24px; height: 24px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 6px; border: 1.5px solid;
+    }
+    .sc-adsr-label.a { color: #c49bff; border-color: rgba(196,155,255,0.3); }
+    .sc-adsr-label.d { color: #6bc5ff; border-color: rgba(107,197,255,0.3); }
+    .sc-adsr-label.s { color: #4fdbaf; border-color: rgba(79,219,175,0.3); }
+    .sc-adsr-label.r { color: #ff6b8a; border-color: rgba(255,107,138,0.3); }
+
+    #adsr-canvas {
+      background: rgba(255,255,255,0.03); border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+
+    /* ---- Start Overlay ---- */
+    #start-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(5,5,12,0.92);
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      cursor: pointer; transition: opacity 0.7s ease; user-select: none;
+    }
+    #start-overlay.hidden { opacity: 0; pointer-events: none; }
+    .overlay-icon { font-size: 48px; margin-bottom: 18px; animation: float 3s ease-in-out infinite; text-align: center; }
+    .overlay-title {
+      font-size: 34px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 10px; text-align: center;
+      background: linear-gradient(135deg,#fff,rgba(210,180,140,0.9));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .overlay-subtitle {
+      font-size: 13px; font-weight: 300; color: rgba(255,255,255,0.4);
+      letter-spacing: 2px; text-transform: uppercase; text-align: center;
+      animation: pulse 2.5s ease-in-out infinite;
+    }
+    .overlay-content { text-align: center; }
+
+    /* ---- Animations ---- */
+    @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; } }
+    @keyframes float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-10px); } }
+    @keyframes floatTxt { 0%,100% { transform:translateY(0) translateX(-50%); } 50% { transform:translateY(-5px) translateX(-50%); } }
+    @keyframes pulse { 0%,100% { opacity:0.4; } 50% { opacity:0.7; } }
+
+    @keyframes glyphDrawOn {
+      from { stroke-dasharray: 0 9999; opacity: 0; }
+      to { stroke-dasharray: 9999 0; opacity: 1; }
+    }
+    @keyframes glyphFadeIn {
+      from { opacity: 0; transform: scale(0); }
+      to { opacity: 0.85; transform: scale(1); }
+    }
+    @keyframes glyphRain {
+      0% { opacity: 0; transform: translateY(-8px); }
+      40% { opacity: 0.7; }
+      100% { opacity: 0; transform: translateY(16px); }
+    }
+    @keyframes glyphWave {
+      0% { opacity: 0; transform: scale(0.4) translateY(20px); }
+      30% { opacity: 0.8; }
+      100% { opacity: 0; transform: scale(1.5) translateY(-30px); }
+    }
+    @keyframes glyphPulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.9; }
+    }
+    @keyframes glyphSandDrop {
+      0% { transform: translateY(-30px); opacity: 0; }
+      20% { opacity: 1; }
+      100% { transform: translateY(40px); opacity: 0; }
+    }
+    .glyph-spin { animation: spin 24s linear infinite; }
+    .glyph-sway { animation: sway 5s ease-in-out infinite; }
+    .glyph-flicker { animation: flicker 2.4s ease-in-out infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes sway { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+    @keyframes flicker { 0%, 100% { opacity: 1; } 25% { opacity: 0.55; } 50% { opacity: 1; } 75% { opacity: 0.8; } }
+
+
+    /* ---- Responsive ---- */
+    @media (max-width: 900px) {
+      .hud-panel { min-width: 160px; top: 60px; padding: 8px 12px; }
+      .chord-label { font-size: 44px; bottom: 120px; }
+      .chord-label.p1 { left: 20px; }
+      .chord-label.p2 { right: 20px; }
+      #sound-controls { width: 340px; display: none; } /* hide sound controls on small screens for visual layout */
+    }
+  </style>
+
+  <!-- MediaPipe dependencies (local libs with CDN fallback) -->
+  <script src="libs/hands/hands.js"></script>
+  <script src="libs/camera_utils.js"></script>
+  <!-- Tone.js -->
+  <script src="libs/Tone.js"></script>
+</head>
+<body>
+  <video id="webcam" playsinline></video>
+  <!-- Player 1 Control Panels -->
+  <div id="p1-left-panel" class="left-panel p1">
+    <div class="panel-header">P1 Root Note</div>
+    <div class="gesture-list">
+      <div class="gesture-card" data-note="C"><span class="gesture-emoji">🫰</span><span class="gesture-label">C</span></div>
+      <div class="gesture-card" data-note="D"><span class="gesture-emoji">✌️</span><span class="gesture-label">D</span></div>
+      <div class="gesture-card" data-note="E"><span class="gesture-emoji">👌</span><span class="gesture-label">E</span></div>
+      <div class="gesture-card" data-note="F"><span class="gesture-emoji">🤟</span><span class="gesture-label">F</span></div>
+      <div class="gesture-card" data-note="G"><span class="gesture-emoji">✋</span><span class="gesture-label">G</span></div>
+      <div class="gesture-card" data-note="A"><span class="gesture-emoji">🤙</span><span class="gesture-label">A</span></div>
+      <div class="gesture-card" data-note="B"><span class="gesture-emoji">☝️</span><span class="gesture-label">B</span></div>
+      <div class="gesture-card" data-note="C5"><span class="gesture-emoji">🤌</span><span class="gesture-label">C (8va)</span></div>
+      <div class="gesture-card stop" data-note="Stop"><span class="gesture-emoji">👊</span><span class="gesture-label">Stop</span></div>
+    </div>
+  </div>
+
+  <div id="p1-right-panel" class="right-panel p1">
+    <div class="panel-header">P1 Chord Type</div>
+    <div class="orbital-container">
+      <div class="orbital-center">pick</div>
+      <div class="orbital-node" data-quality="Maj7" style="--angle:270deg">
+        <span class="node-emoji">🌙</span>
+        <span class="node-label">Maj 7</span>
+      </div>
+      <div class="orbital-node" data-quality="Major" style="--angle:315deg">
+        <span class="node-emoji">☀️</span>
+        <span class="node-label">Major</span>
+      </div>
+      <div class="orbital-node" data-quality="Dom7" style="--angle:0deg">
+        <span class="node-emoji">⚡</span>
+        <span class="node-label">Dom 7</span>
+      </div>
+      <div class="orbital-node" data-quality="Minor" style="--angle:45deg">
+        <span class="node-emoji">🌧️</span>
+        <span class="node-label">Minor</span>
+      </div>
+      <div class="orbital-node" data-quality="Min7" style="--angle:90deg">
+        <span class="node-emoji">🌊</span>
+        <span class="node-label">Min 7</span>
+      </div>
+      <div class="orbital-node" data-quality="Dim" style="--angle:135deg">
+        <span class="node-emoji">🕳️</span>
+        <span class="node-label">Dim</span>
+      </div>
+      <div class="orbital-node" data-quality="Sus4" style="--angle:180deg">
+        <span class="node-emoji">⏳</span>
+        <span class="node-label">Sus 4</span>
+      </div>
+      <div class="orbital-node" data-quality="Sus2" style="--angle:225deg">
+        <span class="node-emoji">🫧</span>
+        <span class="node-label">Sus 2</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Player 2 Control Panels -->
+  <div id="p2-left-panel" class="left-panel p2">
+    <div class="panel-header">P2 Root Note</div>
+    <div class="gesture-list">
+      <div class="gesture-card" data-note="C"><span class="gesture-emoji">🫰</span><span class="gesture-label">C</span></div>
+      <div class="gesture-card" data-note="D"><span class="gesture-emoji">✌️</span><span class="gesture-label">D</span></div>
+      <div class="gesture-card" data-note="E"><span class="gesture-emoji">👌</span><span class="gesture-label">E</span></div>
+      <div class="gesture-card" data-note="F"><span class="gesture-emoji">🤟</span><span class="gesture-label">F</span></div>
+      <div class="gesture-card" data-note="G"><span class="gesture-emoji">✋</span><span class="gesture-label">G</span></div>
+      <div class="gesture-card" data-note="A"><span class="gesture-emoji">🤙</span><span class="gesture-label">A</span></div>
+      <div class="gesture-card" data-note="B"><span class="gesture-emoji">☝️</span><span class="gesture-label">B</span></div>
+      <div class="gesture-card" data-note="C5"><span class="gesture-emoji">🤌</span><span class="gesture-label">C (8va)</span></div>
+      <div class="gesture-card stop" data-note="Stop"><span class="gesture-emoji">👊</span><span class="gesture-label">Stop</span></div>
+    </div>
+  </div>
+
+  <div id="p2-right-panel" class="right-panel p2">
+    <div class="panel-header">P2 Chord Type</div>
+    <div class="orbital-container">
+      <div class="orbital-center">pick</div>
+      <div class="orbital-node" data-quality="Maj7" style="--angle:270deg">
+        <span class="node-emoji">🌙</span>
+        <span class="node-label">Maj 7</span>
+      </div>
+      <div class="orbital-node" data-quality="Major" style="--angle:315deg">
+        <span class="node-emoji">☀️</span>
+        <span class="node-label">Major</span>
+      </div>
+      <div class="orbital-node" data-quality="Dom7" style="--angle:0deg">
+        <span class="node-emoji">⚡</span>
+        <span class="node-label">Dom 7</span>
+      </div>
+      <div class="orbital-node" data-quality="Minor" style="--angle:45deg">
+        <span class="node-emoji">🌧️</span>
+        <span class="node-label">Minor</span>
+      </div>
+      <div class="orbital-node" data-quality="Min7" style="--angle:90deg">
+        <span class="node-emoji">🌊</span>
+        <span class="node-label">Min 7</span>
+      </div>
+      <div class="orbital-node" data-quality="Dim" style="--angle:135deg">
+        <span class="node-emoji">🕳️</span>
+        <span class="node-label">Dim</span>
+      </div>
+      <div class="orbital-node" data-quality="Sus4" style="--angle:180deg">
+        <span class="node-emoji">⏳</span>
+        <span class="node-label">Sus 4</span>
+      </div>
+      <div class="orbital-node" data-quality="Sus2" style="--angle:225deg">
+        <span class="node-emoji">🫧</span>
+        <span class="node-label">Sus 2</span>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <!-- Single Player Ambient Background -->
+  <div id="single-ambient-bg">
+    <div class="amb-center-glow"></div>
+    <div class="amb-nebula top-right"></div>
+    <div class="amb-nebula bot-left"></div>
+  </div>
+
+  <!-- Single Player Header -->
+  <div id="single-header">
+    <div class="header-line"></div>
+    <span class="header-label">AR Chord Player</span>
+    <div class="header-line"></div>
+  </div>
+
+  <!-- Center Chord Glyph (Single Player) -->
+  <div id="chord-glyph-container">
+    <div class="glyph-bloom"></div>
+    <div class="glyph-inner"></div>
+  </div>
+
+  <!-- Chord Name Display (Single Player) -->
+  <div id="chord-name-display">
+    <div class="chord-text" id="glyph-chord-text">— —</div>
+    <div class="chord-quality" id="glyph-chord-quality"></div>
+  </div>
+
+  <!-- Single Player Bottom Hint -->
+  <div id="single-bottom-hint">
+    <span>Bimanual gesture mode · AR overlay</span>
+  </div>
+
+  <!-- Solo & Accompaniment Mode Header -->
+  <div id="solo-accomp-header">
+    <div class="header-line"></div>
+    <span class="header-label">Solo & Accompaniment</span>
+    <div class="header-line"></div>
+  </div>
+
+  <!-- Solo & Accomp Scale Selector -->
+  <div id="solo-scale-selector">
+    <button class="sa-scale-btn active" data-scale="pentatonic">Pentatonic</button>
+    <button class="sa-scale-btn" data-scale="major">Major</button>
+    <button class="sa-scale-btn" data-scale="minor">Minor</button>
+    <button class="sa-scale-btn" data-scale="blues">Blues</button>
+  </div>
+
+  <!-- Solo & Accomp HUD -->
+  <div id="solo-accomp-hud">
+    <div class="sa-col">
+      <span class="sa-label">Note</span>
+      <span class="sa-value sa-note" id="sa-note-display">—</span>
+    </div>
+    <div class="sa-col">
+      <span class="sa-label">Articulation</span>
+      <span class="sa-articulation legato" id="sa-artic-display">Legato</span>
+    </div>
+    <div class="sa-col">
+      <span class="sa-label">Expression</span>
+      <div class="sa-bar-track"><div class="sa-bar-fill" id="sa-expr-bar" style="width:50%"></div></div>
+    </div>
+    <div class="sa-col">
+      <span class="sa-label">Reverb</span>
+      <div class="sa-bar-track"><div class="sa-bar-fill" id="sa-reverb-bar" style="width:30%"></div></div>
+    </div>
+  </div>
+
+
+
+  <!-- P1 HUD Panel -->
+  <div id="p1-hud" class="hud-panel p1">
+    <div class="hud-header">[P1] Player 1</div>
+    <div class="hud-chord" id="p1-hud-chord">—</div>
+    <div class="hud-bar-container">
+      <div class="hud-bar" id="p1-hud-bar" style="width: 0%"></div>
+    </div>
+    <div class="hud-fingers" id="p1-hud-fingers">Fingers: 0 0 0 0 0</div>
+  </div>
+
+  <!-- P2 HUD Panel -->
+  <div id="p2-hud" class="hud-panel p2">
+    <div class="hud-header">Player 2 [P2]</div>
+    <div class="hud-chord" id="p2-hud-chord">—</div>
+    <div class="hud-bar-container">
+      <div class="hud-bar" id="p2-hud-bar" style="width: 0%"></div>
+    </div>
+    <div class="hud-fingers" id="p2-hud-fingers">Fingers: 0 0 0 0 0</div>
+  </div>
+
+  <!-- Mode Selector Floating Header -->
+  <div id="mode-selector-container">
+    <button class="mode-btn active" id="btn-mode-single" data-mode="single">Single Player</button>
+    <button class="mode-btn" id="btn-mode-duo" data-mode="duo">Collaborative Duo</button>
+    <button class="mode-btn" id="btn-mode-solo-accomp" data-mode="solo_accomp">Solo & Accomp</button>
+  </div>
+
+  <!-- Big Chord Name Overlays -->
+  <div id="p1-chord-label" class="chord-label p1">—</div>
+  <div id="harmony-label" class="harmony-label"></div>
+  <div id="p2-chord-label" class="chord-label p2">—</div>
+
+  <!-- Session Scoreboard -->
+  <div id="scoreboard">🎵 Session  Chords Triggered: 0</div>
+
+  <!-- Performance mode warning banner -->
+  <div id="perf-warning" class="perf-warning hidden">Performance mode: 1 hand per player</div>
+
+  <!-- Shared Sound Controls Panel -->
+  <div id="sound-controls">
+    <div class="sc-header">
+      <span class="sc-grip">⠿⠿</span>
+      <span>SOUND CONTROLS</span>
+      <button class="sc-toggle" id="sc-toggle-btn">—</button>
+    </div>
+    <!-- Player Selection Tabs -->
+    <div class="sc-tabs" id="sc-tabs">
+      <button class="sc-tab-btn active" id="sc-tab-p1" data-player="1">P1 Settings</button>
+      <button class="sc-tab-btn" id="sc-tab-p2" data-player="2" style="display: none;">P2 Settings</button>
+    </div>
+    <div class="sc-body" id="sc-body">
+      <!-- Timbre -->
+      <div class="sc-section">
+        <div class="sc-section-label">TIMBRE</div>
+        <div class="sc-timbre-group">
+          <button class="sc-timbre-btn" data-timbre="synth">Synth Keys<br><small>FM Rhodes · smooth</small></button>
+          <button class="sc-timbre-btn active" data-timbre="strings">Strings<br><small>cello · violin</small></button>
+          <button class="sc-timbre-btn" data-timbre="woodwind">Woodwind<br><small>flute · clarinet</small></button>
+        </div>
+      </div>
+      <!-- Autoplay Level -->
+      <div class="sc-section">
+        <div class="sc-section-label">AUTOPLAY (SMART INSTRUMENT)</div>
+        <div class="sc-timbre-group">
+          <button class="sc-autoplay-btn active" data-level="0">Level 0<br><small>block chord</small></button>
+          <button class="sc-autoplay-btn" data-level="1">Level 1<br><small>sparse pattern</small></button>
+          <button class="sc-autoplay-btn" data-level="2">Level 2<br><small>moderate arp</small></button>
+          <button class="sc-autoplay-btn" data-level="3">Level 3<br><small>complex melody</small></button>
+        </div>
+      </div>
+      <!-- Filter -->
+      <div class="sc-section">
+        <div class="sc-row">
+          <div class="sc-slider-group">
+            <label>HP<span class="sc-val" id="hp-val">20Hz</span></label>
+            <input type="range" class="sc-range hp" id="hp-filter" min="20" max="2000" value="20">
+          </div>
+          <div class="sc-slider-group">
+            <label>LP<span class="sc-val" id="lp-val">20.0k</span></label>
+            <input type="range" class="sc-range lp" id="lp-filter" min="1000" max="20000" value="20000">
+          </div>
+        </div>
+      </div>
+      <!-- Spatial Settings & Master Volume -->
+      <div class="sc-section">
+        <div class="sc-row">
+          <div class="sc-slider-group">
+            <label>Master Vol</label>
+            <input type="range" class="sc-range" id="volume-slider" min="0" max="100" value="90">
+          </div>
+          <div class="sc-slider-group">
+            <label>Dynamics</label>
+            <input type="range" class="sc-range" id="dynamics-slider" min="10" max="100" value="55">
+          </div>
+        </div>
+      </div>
+      <!-- Spatial Reverb -->
+      <div class="sc-section">
+        <div class="sc-slider-group" style="width:100%">
+          <label>Space Mix (Reverb)<span class="sc-val">30%</span></label>
+          <input type="range" class="sc-range reverb" id="reverb-slider" min="0" max="100" value="30">
+        </div>
+      </div>
+      <!-- ADSR Envelopes -->
+      <div class="sc-section">
+        <div class="sc-section-label">ADSR Envelope</div>
+        <div class="sc-adsr-row">
+          <div class="sc-adsr-slider">
+            <span class="sc-adsr-val" id="a-val">0.08s</span>
+            <input type="range" class="sc-range-v adsr-a" id="adsr-a" min="1" max="2000" value="80" orient="vertical">
+            <span class="sc-adsr-label a">A</span>
+          </div>
+          <div class="sc-adsr-slider">
+            <span class="sc-adsr-val" id="d-val">0.30s</span>
+            <input type="range" class="sc-range-v adsr-d" id="adsr-d" min="10" max="3000" value="300" orient="vertical">
+            <span class="sc-adsr-label d">D</span>
+          </div>
+          <div class="sc-adsr-slider">
+            <span class="sc-adsr-val" id="s-val">50%</span>
+            <input type="range" class="sc-range-v adsr-s" id="adsr-s" min="0" max="100" value="50" orient="vertical">
+            <span class="sc-adsr-label s">S</span>
+          </div>
+          <div class="sc-adsr-slider">
+            <span class="sc-adsr-val" id="r-val">1.00s</span>
+            <input type="range" class="sc-range-v adsr-r" id="adsr-r" min="10" max="5000" value="1000" orient="vertical">
+            <span class="sc-adsr-label r">R</span>
+          </div>
+          <canvas id="adsr-canvas" width="160" height="100"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio Start Click Gate -->
+  <div id="start-overlay">
+    <div class="overlay-content">
+      <div class="overlay-icon">🎵</div>
+      <h1 class="overlay-title">Gesture Symphony</h1>
+      <p class="overlay-subtitle">Tap anywhere to begin</p>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       APPLICATION LOGIC
+       ============================================================ -->
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      alert(`JS Error: ${message}\nLine: ${lineno}:${colno}\nSource: ${source}`);
+      return false;
+    };
+    window.onunhandledrejection = function(event) {
+      alert(`Unhandled Promise Rejection: ${event.reason}`);
+    };
+
+    // ===================================================================
+    // 1. CONSTANTS & MAPPINGS
+    // ===================================================================
+    const LM = {
+      WRIST:0,
+      THUMB_CMC:1, THUMB_MCP:2, THUMB_IP:3, THUMB_TIP:4,
+      INDEX_MCP:5, INDEX_PIP:6, INDEX_DIP:7, INDEX_TIP:8,
+      MIDDLE_MCP:9, MIDDLE_PIP:10, MIDDLE_DIP:11, MIDDLE_TIP:12,
+      RING_MCP:13, RING_PIP:14, RING_DIP:15, RING_TIP:16,
+      PINKY_MCP:17, PINKY_PIP:18, PINKY_DIP:19, PINKY_TIP:20
+    };
+
+    const BONES = [
+      [0,1],[0,5],[0,17],[5,9],[9,13],[13,17],
+      [1,2],[2,3],[3,4],
+      [5,6],[6,7],[7,8],
+      [9,10],[10,11],[11,12],
+      [13,14],[14,15],[15,16],
+      [17,18],[18,19],[19,20]
+    ];
+
+    // Chord quality intervals (semitones from root)
+    const QUALITY_INTERVALS = {
+      'Major': [0,4,7],       'Minor': [0,3,7],
+      'Maj7':  [0,4,7,11],    'Min7':  [0,3,7,10],
+      'Dom7':  [0,4,7,10],    'Dim':   [0,3,6],
+      'Sus4':  [0,5,7],       'Sus2':  [0,2,7]
+    };
+
+    // Harmony relationships (matching root+quality combinations)
+    const HARMONIOUS_PAIRS = {
+      'C+Am':   '♥ vi chord (Relative Minor)',
+      'C+Em':   '♥ iii chord (Mediant Minor)',
+      'C+G':    '♥ V chord (Perfect Fifth)',
+      'G+Em':   '♥ vi chord (Relative Minor)',
+      'Am+F':   '♥ IV chord (Subdominant)',
+      'Am+Em':  '♥ v chord (Minor Dominant)',
+      'F+C':    '♥ IV–I (Plagal Cadence)',
+      'G+Am':   '♥ V–vi (Deceptive Resolution)',
+      'D+Bm':   '♥ vi chord (Relative Minor)',
+      'A+D':    '♥ IV chord (Perfect Fourth)',
+      'E+Am':   '♥ V–i (Authentic Cadence)',
+    };
+
+    const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+    const TOP_BAR_LABELS = ['C','D','E','F','G','A','B','Stop'];
+    const BAR_H = 54;
+    const BAR_PAD = 6;
+
+    // ===================================================================
+    // 2. STATE & AUDIO STUFF
+    // ===================================================================
+    let audioStarted = false;
+    let seqLoop = null;
+    let seqStep = 0;
+
+    // Mode Selector & Sound Tabs
+    let playMode = 'single'; // 'single', 'duo', or 'solo_accomp'
+    let currentTabPlayer = 1; // 1 or 2
+
+    // Independent Player 1 debounces (Root & Quality)
+    let p1LastRawRoot = null, p1RootSince = 0, p1StableRoot = null;
+    let p1LastRawQuality = null, p1QualitySince = 0, p1StableQuality = 'Major';
+
+    // Independent Player 2 debounces (Root & Quality)
+    let p2LastRawRoot = null, p2RootSince = 0, p2StableRoot = null;
+    let p2LastRawQuality = null, p2QualitySince = 0, p2StableQuality = 'Major';
+
+    const DEBOUNCE_ROOT_MS = 180;
+    const DEBOUNCE_QUALITY_MS = 120;
+    const POINT_HIT_RADIUS = 135;
+
+    // Session Scoreboard stats
+    let p1ChordsCount = 0;
+    let p2ChordsCount = 0;
+    let togetherHarmoniesCount = 0;
+    let lastTrackedP1Chord = null;
+    let lastTrackedP2Chord = null;
+    let lastTrackedHarmony = null;
+
+    // Active chord tracking keys (to prevent redundant triggers)
+    let p1PrevChordKey = null;
+    let p2PrevChordKey = null;
+    let lastVfxComboKey = null;
+
+    // Mouse / touch manual controls
+    let mouseX = 0, mouseY = 0;
+    let manualOverride = null;
+    let manualOverrideTimeout = null;
+
+    // FPS
+    let frameTick = 0;
+    let fpsLastSec = performance.now();
+    let fps = 0;
+    let maxHandsSetting = 4; // Track all 4 hands for two players
+    let showPerfWarning = false;
+
+    // Tone.js Instrument banks & routing
+    let p1ChordActive = null, p1ArpActive = null;
+    let p2ChordActive = null, p2ArpActive = null;
+    let reverb = null, vol = null;
+
+    // Independent Player Signal Chain Nodes
+    let p1Panner = null, p1HpFilter = null, p1LpFilter = null, p1VolumeNode = null;
+    let p2Panner = null, p2HpFilter = null, p2LpFilter = null, p2VolumeNode = null;
+
+    const p1Instruments = { strings: { chord: null, arp: null }, synth: { chord: null, arp: null }, woodwind: { chord: null, arp: null } };
+    const p2Instruments = { strings: { chord: null, arp: null }, synth: { chord: null, arp: null }, woodwind: { chord: null, arp: null } };
+
+    let samplersLoaded = false;
+    let samplersLoadedCount = 0;
+
+    // Independent Player 1 settings
+    const p1Dsp = {
+      attack: 0.08, decay: 0.3, sustain: 0.5, release: 1.0,
+      hpFreq: 20, lpFreq: 20000,
+      volume: -6, velocity: 0.55,
+      timbre: 'strings',
+      autoplayLevel: 0
+    };
+
+    // Independent Player 2 settings
+    const p2Dsp = {
+      attack: 0.08, decay: 0.3, sustain: 0.5, release: 1.0,
+      hpFreq: 20, lpFreq: 20000,
+      volume: -6, velocity: 0.55,
+      timbre: 'strings',
+      autoplayLevel: 0
+    };
+
+    let reverbWet = 0.3;
+    let masterVolume = -6; // global trim dB
+
+    // ADSR graph canvas
+    let adsrCanvas = null, adsrCtx = null;
+
+    // Screen canvases
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const videoEl = document.getElementById('webcam');
+
+    // Cello / Violin local samples mapping (same as original)
+    const SAMPLE_BASE = 'samples/';
+    const CELLO_URLS = {
+      'C2':'C2.mp3','E2':'E2.mp3','G2':'G2.mp3','A2':'A2.mp3',
+      'C3':'C3.mp3','E3':'E3.mp3','G3':'G3.mp3','A3':'A3.mp3',
+      'C4':'C4.mp3','E4':'E4.mp3','G4':'G4.mp3','A4':'A4.mp3'
+    };
+    const VIOLIN_URLS = {
+      'A3':'A3.mp3','C4':'C4.mp3','E4':'E4.mp3','G4':'G4.mp3',
+      'A4':'A4.mp3','C5':'C5.mp3','E5':'E5.mp3','G5':'G5.mp3',
+      'A5':'A5.mp3','C6':'C6.mp3','E6':'E6.mp3','G6':'G6.mp3'
+    };
+
+    // ===================================================================
+    // 3. FINGER STATE CALCULATION
+    // ===================================================================
+    function d(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+    function scrX(x) { return (1 - x) * canvas.width; }
+    function scrY(y) { return y * canvas.height; }
+
+    function fingerExtended(lm, tip, pip) {
+      const w = lm[LM.WRIST];
+      const dTip = Math.hypot(lm[tip].x - w.x, lm[tip].y - w.y);
+      const dPip = Math.hypot(lm[pip].x - w.x, lm[pip].y - w.y);
+      return dTip > dPip * 1.05;
+    }
+
+    function fingerCurled(lm, tip, pip) { return !fingerExtended(lm, tip, pip); }
+
+    function thumbOut(lm, label) {
+      const tip = lm[LM.THUMB_TIP], ip = lm[LM.THUMB_IP];
+      return label === 'Left' ? (tip.x > ip.x + 0.015) : (tip.x < ip.x - 0.015);
+    }
+
+    function getFingerBits(lm, label) {
+      const idxE = fingerExtended(lm, LM.INDEX_TIP, LM.INDEX_PIP) ? 1 : 0;
+      const midE = fingerExtended(lm, LM.MIDDLE_TIP, LM.MIDDLE_PIP) ? 1 : 0;
+      const rngE = fingerExtended(lm, LM.RING_TIP, LM.RING_PIP) ? 1 : 0;
+      const pnkE = fingerExtended(lm, LM.PINKY_TIP, LM.PINKY_PIP) ? 1 : 0;
+
+      const thmE = thumbOut(lm, label);
+      const handScale = d(lm[LM.WRIST], lm[LM.MIDDLE_MCP]);
+      const scale = handScale > 0.01 ? handScale : 1.0;
+      const thumbWide = (d(lm[LM.THUMB_TIP], lm[LM.INDEX_MCP]) / scale) > 0.65;
+      const tE = (thmE || thumbWide) ? 1 : 0;
+
+      return [tE, idxE, midE, rngE, pnkE];
+    }
+
+    // ===================================================================
+    // 4. CHORD LOOKUP & PARCELLING
+    // ===================================================================
+    function partitionHands(results) {
+      const p1Hands = [];
+      const p2Hands = [];
+      const p1Handedness = [];
+      const p2Handedness = [];
+
+      if (results.multiHandLandmarks && results.multiHandedness) {
+        for (const [i, landmarks] of results.multiHandLandmarks.entries()) {
+          const wristX = landmarks[0].x;
+          const info = results.multiHandedness[i];
+          // Raw wristX >= 0.5 is left side of mirrored screen (Player 1)
+          // Raw wristX < 0.5 is right side of mirrored screen (Player 2)
+          if (wristX >= 0.5) {
+            p1Hands.push(landmarks);
+            p1Handedness.push(info);
+          } else {
+            p2Hands.push(landmarks);
+            p2Handedness.push(info);
+          }
+        }
+      }
+      return { p1Hands, p1Handedness, p2Hands, p2Handedness };
+    }
+
+    function d(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+    function scrX(x) { return (1 - x) * canvas.width; }
+    function scrY(y) { return y * canvas.height; }
+
+    function fingerExtended(lm, tip, pip) {
+      const w = lm[LM.WRIST];
+      const dTip = Math.hypot(lm[tip].x - w.x, lm[tip].y - w.y);
+      const dPip = Math.hypot(lm[pip].x - w.x, lm[pip].y - w.y);
+      return dTip > dPip * 1.05;
+    }
+
+    function fingerCurled(lm, tip, pip) {
+      return !fingerExtended(lm, tip, pip);
+    }
+
+    function thumbOut(lm, label) {
+      const tip = lm[LM.THUMB_TIP], ip = lm[LM.THUMB_IP];
+      return label === 'Left' ? (tip.x > ip.x + 0.015) : (tip.x < ip.x - 0.015);
+    }
+
+    // Strict Left-Hand Gesture detection (returns C, D, E, F, G, A, B, or Stop)
+    function detectLeftGesture(lm, label) {
+      const idxE = fingerExtended(lm, LM.INDEX_TIP, LM.INDEX_PIP);
+      const midE = fingerExtended(lm, LM.MIDDLE_TIP, LM.MIDDLE_PIP);
+      const rngE = fingerExtended(lm, LM.RING_TIP, LM.RING_PIP);
+      const pnkE = fingerExtended(lm, LM.PINKY_TIP, LM.PINKY_PIP);
+      const thmE = thumbOut(lm, label);
+
+      const midC = !midE, rngC = !rngE, pnkC = !pnkE;
+
+      const handScale = d(lm[LM.WRIST], lm[LM.MIDDLE_MCP]);
+      const scale = handScale > 0.01 ? handScale : 1.0;
+
+      // 0. 🤌 C5 — Pinch: all 5 finger tips touching together
+      const t_i = d(lm[LM.THUMB_TIP], lm[LM.INDEX_TIP]) / scale;
+      const t_m = d(lm[LM.THUMB_TIP], lm[LM.MIDDLE_TIP]) / scale;
+      const t_r = d(lm[LM.THUMB_TIP], lm[LM.RING_TIP]) / scale;
+      const t_p = d(lm[LM.THUMB_TIP], lm[LM.PINKY_TIP]) / scale;
+      if (t_i < 0.42 && t_m < 0.42 && t_r < 0.42 && t_p < 0.42) return 'C5';
+
+      const thumbIdxDistNorm = d(lm[LM.THUMB_TIP], lm[LM.INDEX_TIP]) / scale;
+      const idxTipToMCPNorm = d(lm[LM.INDEX_TIP], lm[LM.INDEX_MCP]) / scale;
+      const thumbIdxMCPDistNorm = d(lm[LM.THUMB_TIP], lm[LM.INDEX_MCP]) / scale;
+
+      // 1. 👌 E — OK hand: thumb+index touching, others EXTENDED
+      if (thumbIdxDistNorm < 0.5 && midE && rngE && pnkE) return 'E';
+
+      // 2. 🫰 C — Finger heart: thumb+index touching, others CURLED
+      if (thumbIdxDistNorm < 0.5 && midC && rngC && pnkC && idxTipToMCPNorm > 0.4) return 'C';
+
+      // 3. 👊 Stop — Fist: all fingers curled tightly
+      if (!idxE && midC && rngC && pnkC && idxTipToMCPNorm <= 0.4) return 'Stop';
+
+      // 4. 🤟 F — ILY: thumb+index+pinky extended, middle+ring curled
+      if (thmE && idxE && pnkE && midC && rngC) return 'F';
+
+      // 5. 🤙 A — Shaka: thumb+pinky extended, index/mid/ring curled
+      const thumbWide = thumbIdxMCPDistNorm > 0.65;
+      if ((thmE || thumbWide) && pnkE && !idxE && midC && rngC) return 'A';
+
+      // 6. ✌️ D — Peace: index+middle extended, ring+pinky curled
+      if (idxE && midE && rngC && pnkC) return 'D';
+
+      // 7. ☝️ B — Point up: only index extended, index and thumb not touching
+      if (idxE && midC && rngC && pnkC && thumbIdxDistNorm > 0.55) return 'B';
+
+      // 8. ✋ G — Open palm: all 4 fingers extended
+      if (idxE && midE && rngE && pnkE) return 'G';
+
+      return null;
+    }
+
+    // Right-Hand pointing hit test against player's orbital nodes
+    function detectRightHandPointingForPlayer(lm, playerNum) {
+      const idxE = fingerExtended(lm, LM.INDEX_TIP, LM.INDEX_PIP);
+      if (!idxE) return null;
+
+      const tipX = (1 - lm[LM.INDEX_TIP].x) * canvas.width;
+      const tipY = lm[LM.INDEX_TIP].y * canvas.height;
+
+      const selector = playerNum === 1 ? '#p1-right-panel .orbital-node' : '#p2-right-panel .orbital-node';
+      const nodes = document.querySelectorAll(selector);
+      let closest = null, closestDist = Infinity;
+
+      for (const node of nodes) {
+        const rect = node.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const dist = Math.hypot(tipX - cx, tipY - cy);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closest = node.dataset.quality;
+        }
+      }
+
+      return (closestDist <= POINT_HIT_RADIUS) ? closest : null;
+    }
+
+    function checkHarmony(c1, c2) {
+      if (!c1 || c1 === '—' || !c2 || c2 === '—') return null;
+      const key1 = c1 + '+' + c2;
+      const key2 = c2 + '+' + c1;
+      return HARMONIOUS_PAIRS[key1] || HARMONIOUS_PAIRS[key2] || null;
+    }
+
+    // ===================================================================
+    // 5. AUDIO SYSTEM IMPLEMENTATION
+    // ===================================================================
+    function midiToNote(m) {
+      return NOTE_NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
+    }
+
+    const CHORD_CENTER = 60;    // C4 reference
+    const BASS_MIDI_BASE = 36;  // C2 reference
+
+    function nearestOctave(pc, ref, lo = 36, hi = 96) {
+      let best = pc, bestDist = Infinity;
+      for (let m = pc; m <= hi; m += 12) {
+        if (m < lo) continue;
+        const dist = Math.abs(m - ref);
+        if (dist < bestDist) { bestDist = dist; best = m; }
+      }
+      return best;
+    }
+
+    // Voice block chord dynamically based on root and quality intervals
+    function voiceBlockChord(root, quality) {
+      if (!root || root === 'Stop' || !quality) return null;
+      let ri = NOTE_NAMES.indexOf(root);
+      let octaveOffset = 0;
+      if (root === 'C5') {
+        ri = 0;
+        octaveOffset = 12;
+      }
+      const iv = QUALITY_INTERVALS[quality];
+      if (ri < 0 || !iv) return null;
+
+      const bass = midiToNote((ri % 12) + BASS_MIDI_BASE + octaveOffset);
+      const body = iv.map(interval => {
+        const pc = (ri + interval) % 12;
+        return midiToNote(nearestOctave(pc, CHORD_CENTER + octaveOffset, 52 + octaveOffset, 76 + octaveOffset));
+      });
+      return [bass, ...body];
+    }
+
+    // Build arpeggiator ascending note pool dynamically
+    function buildArpPool(root, quality) {
+      if (!root || root === 'Stop' || !quality) return null;
+      let ri = NOTE_NAMES.indexOf(root);
+      let octaveOffset = 0;
+      if (root === 'C5') {
+        ri = 0;
+        octaveOffset = 12;
+      }
+      const base = QUALITY_INTERVALS[quality];
+      if (ri < 0 || !base) return null;
+
+      const intervals = new Set(base);
+      intervals.add(14); // 9th for shimmer
+      if (base.length === 3 && quality !== 'Dim') {
+        const isMinor = base.includes(3);
+        intervals.add(isMinor ? 10 : 11); // color 7th on bare triads
+      }
+      const sorted = [...intervals].sort((a, b) => a - b);
+
+      const rootMidi = ri + 60 + octaveOffset;
+      const pool = [];
+      for (const octave of [0, 12]) {
+        for (const iv of sorted) pool.push(rootMidi + octave + iv);
+      }
+      return pool.map(midiToNote);
+    }
+
+    function chordDisplayName(root, quality) {
+      if (!root || root === 'Stop' || !quality) return '—';
+      const rootLabel = root === 'C5' ? 'C (8va)' : root;
+      const m = { Major:'', Minor:'m', Maj7:'Maj7', Min7:'m7', Dom7:'7', Dim:'dim', Sus4:'sus4', Sus2:'sus2' };
+      return rootLabel + (m[quality] ?? quality);
+    }
+
+    function onSamplerLoaded(which) {
+      samplersLoadedCount++;
+      console.log(`[samples] ${which} section loaded (${samplersLoadedCount}/4)`);
+      if (samplersLoadedCount >= 4) {
+        samplersLoaded = true;
+        const sub = document.querySelector('.overlay-subtitle');
+        if (sub) sub.textContent = 'Tap anywhere to begin';
+      }
+    }
+
+    function initAudio() {
+      // ── Shared Bus ──
+      reverb  = new Tone.Reverb({ decay: 2.2, wet: reverbWet, preDelay: 0.01 });
+      vol     = new Tone.Volume(masterVolume);
+      reverb.chain(vol, Tone.Destination);
+
+      // ── Player 1 Routing ──
+      p1HpFilter = new Tone.Filter({ frequency: p1Dsp.hpFreq, type: 'highpass', rolloff: -12 });
+      p1LpFilter = new Tone.Filter({ frequency: p1Dsp.lpFreq, type: 'lowpass', rolloff: -12 });
+      p1VolumeNode = new Tone.Volume(p1Dsp.volume);
+      p1Panner = new Tone.Panner(-0.4);
+
+      p1Panner.chain(p1HpFilter, p1LpFilter, p1VolumeNode, reverb);
+
+      // ── Player 2 Routing ──
+      p2HpFilter = new Tone.Filter({ frequency: p2Dsp.hpFreq, type: 'highpass', rolloff: -12 });
+      p2LpFilter = new Tone.Filter({ frequency: p2Dsp.lpFreq, type: 'lowpass', rolloff: -12 });
+      p2VolumeNode = new Tone.Volume(p2Dsp.volume);
+      p2Panner = new Tone.Panner(0.4);
+
+      p2Panner.chain(p2HpFilter, p2LpFilter, p2VolumeNode, reverb);
+
+      // ── Player 1 Instrument Bank ──
+      p1Instruments.strings.chord = new Tone.Sampler({
+        urls: CELLO_URLS, baseUrl: SAMPLE_BASE + 'cello/',
+        attack: 0.25, release: 1.2, volume: 0,
+        onload: () => onSamplerLoaded('cello-p1')
+      }).connect(p1Panner);
+      p1Instruments.strings.arp = new Tone.Sampler({
+        urls: VIOLIN_URLS, baseUrl: SAMPLE_BASE + 'violin/',
+        attack: 0.03, release: 0.6, volume: -2,
+        onload: () => onSamplerLoaded('violin-p1')
+      }).connect(p1Panner);
+
+      p1Instruments.synth.chord = new Tone.PolySynth(Tone.FMSynth, {
+        maxPolyphony: 8, harmonicity: 3.01, modulationIndex: 1.5,
+        oscillator: { type: 'sine' }, modulation: { type: 'triangle' },
+        envelope: { attack: 0.06, decay: 0.8, sustain: 0.4, release: 1.5 },
+        volume: -6
+      }).connect(p1Panner);
+      p1Instruments.synth.arp = new Tone.PolySynth(Tone.FMSynth, {
+        maxPolyphony: 8, harmonicity: 2.0, modulationIndex: 2.5,
+        oscillator: { type: 'sine' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.01, decay: 0.35, sustain: 0.15, release: 0.5 },
+        volume: -8
+      }).connect(p1Panner);
+
+      p1Instruments.woodwind.chord = new Tone.PolySynth(Tone.FMSynth, {
+        maxPolyphony: 8, harmonicity: 1.0, modulationIndex: 4.0,
+        oscillator: { type: 'sine' }, modulation: { type: 'square' },
+        envelope: { attack: 0.12, decay: 0.6, sustain: 0.5, release: 1.0 },
+        volume: -5
+      }).connect(p1Panner);
+      p1Instruments.woodwind.arp = new Tone.PolySynth(Tone.FMSynth, {
+        maxPolyphony: 8, harmonicity: 1.5, modulationIndex: 5.0,
+        oscillator: { type: 'sine' }, modulation: { type: 'square' },
+        envelope: { attack: 0.02, decay: 0.25, sustain: 0.2, release: 0.4 },
+        volume: -7
+      }).connect(p1Panner);
+
+      // ── Player 2 Instrument Bank ──
+      p2Instruments.strings.chord = new Tone.Sampler({
+        urls: CELLO_URLS, baseUrl: SAMPLE_BASE + 'cello/',
+        attack: 0.25, release: 1.2, volume: 0,
+        onload: () => onSamplerLoaded('cello-p2')
+      }).connect(p2Panner);
+      p2Instruments.strings.arp = new Tone.Sampler({
+        urls: VIOLIN_URLS, baseUrl: SAMPLE_BASE + 'violin/',
+        attack: 0.03, release: 0.6, volume: -2,
+        onload: () => onSamplerLoaded('violin-p2')
+      }).connect(p2Panner);
+
+      p2Instruments.synth.chord = new Tone.PolySynth(Tone.FMSynth, {
+        maxPolyphony: 8, harmonicity: 3.01, modulationIndex: 1.5,
+        oscillator: { type: 'sine' }, modulation: { type: 'triangle' },
+        envelope: { attack: 0.06, decay: 0.8, sustain: 0.4, release: 1.5 },
+        volume: -6
+      }).connect(p2Panner);
+      p2Instruments.synth.arp = new Tone.PolySynth(Tone.FMSynth, {
+        maxPolyphony: 8, harmonicity: 2.0, modulationIndex: 2.5,
+        oscillator: { type: 'sine' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.01, decay: 0.35, sustain: 0.15, release: 0.5 },
+        volume: -8
+      }).connect(p2Panner);
+
+      p2Instruments.woodwind.chord = new Tone.PolySynth(Tone.FMSynth, {
+        maxPolyphony: 8, harmonicity: 1.0, modulationIndex: 4.0,
+        oscillator: { type: 'sine' }, modulation: { type: 'square' },
+        envelope: { attack: 0.12, decay: 0.6, sustain: 0.5, release: 1.0 },
+        volume: -5
+      }).connect(p2Panner);
+      p2Instruments.woodwind.arp = new Tone.PolySynth(Tone.FMSynth, {
+        maxPolyphony: 8, harmonicity: 1.5, modulationIndex: 5.0,
+        oscillator: { type: 'sine' }, modulation: { type: 'square' },
+        envelope: { attack: 0.02, decay: 0.25, sustain: 0.2, release: 0.4 },
+        volume: -7
+      }).connect(p2Panner);
+
+      setTimbre(1, p1Dsp.timbre);
+      setTimbre(2, p2Dsp.timbre);
+
+      // 16th-note clock arpeggiator sequencer
+      Tone.Transport.bpm.value = 100;
+      seqLoop = new Tone.Loop(time => runSequencerStep(time), "16n").start(0);
+    }
+
+    function setTimbre(playerNum, preset) {
+      if (playerNum === 1) {
+        if (p1ChordActive) p1ChordActive.releaseAll();
+        if (p1ArpActive) p1ArpActive.releaseAll();
+        p1ChordActive = p1Instruments[preset].chord;
+        p1ArpActive   = p1Instruments[preset].arp;
+        p1Dsp.timbre = preset;
+        p1PrevChordKey = null;
+        if (p1StableRoot && p1StableRoot !== 'Stop') {
+          const voicedP1 = voiceBlockChord(p1StableRoot, p1StableQuality);
+          triggerChordP1(voicedP1);
+        }
+      } else {
+        if (p2ChordActive) p2ChordActive.releaseAll();
+        if (p2ArpActive) p2ArpActive.releaseAll();
+        p2ChordActive = p2Instruments[preset].chord;
+        p2ArpActive   = p2Instruments[preset].arp;
+        p2Dsp.timbre = preset;
+        p2PrevChordKey = null;
+        if (p2StableRoot && p2StableRoot !== 'Stop') {
+          const voicedP2 = voiceBlockChord(p2StableRoot, p2StableQuality);
+          triggerChordP2(voicedP2);
+        }
+      }
+    }
+
+    function updatePlayerEnvelope(playerNum) {
+      const dsp = playerNum === 1 ? p1Dsp : p2Dsp;
+      const env = { attack: dsp.attack, decay: dsp.decay, sustain: dsp.sustain, release: dsp.release };
+      const instruments = playerNum === 1 ? p1Instruments : p2Instruments;
+
+      for (const p of ['strings', 'synth', 'woodwind']) {
+        const inst = instruments[p];
+        if (!inst) continue;
+        if (p === 'strings') {
+          if (inst.chord) { inst.chord.attack = dsp.attack; inst.chord.release = dsp.release; }
+          if (inst.arp) { inst.arp.attack = dsp.attack; inst.arp.release = dsp.release; }
+        } else {
+          if (inst.chord) inst.chord.set({ envelope: env });
+          if (inst.arp) inst.arp.set({ envelope: env });
+        }
+      }
+    }
+
+    // Sync sound control sliders and buttons with currently active player tab state
+    function updateSoundControlsUI() {
+      const dsp = currentTabPlayer === 1 ? p1Dsp : p2Dsp;
+
+      // 1. Timbre buttons
+      document.querySelectorAll('.sc-timbre-btn').forEach(btn => {
+        if (btn.dataset.timbre === dsp.timbre) btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+
+      // 2. Autoplay buttons
+      document.querySelectorAll('.sc-autoplay-btn').forEach(btn => {
+        if (+btn.dataset.level === dsp.autoplayLevel) btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+
+      // 3. Slider values
+      const hpInput = document.getElementById('hp-filter');
+      if (hpInput) {
+        hpInput.value = dsp.hpFreq;
+        document.getElementById('hp-val').textContent = dsp.hpFreq < 1000 ? dsp.hpFreq + 'Hz' : (dsp.hpFreq/1000).toFixed(1) + 'k';
+      }
+
+      const lpInput = document.getElementById('lp-filter');
+      if (lpInput) {
+        lpInput.value = dsp.lpFreq;
+        document.getElementById('lp-val').textContent = dsp.lpFreq >= 10000 ? (dsp.lpFreq/1000).toFixed(1)+'k' : (dsp.lpFreq/1000).toFixed(2)+'k';
+      }
+
+      const volInput = document.getElementById('volume-slider');
+      if (volInput) {
+        const sliderVal = dsp.volume === -Infinity ? 0 : Math.round((dsp.volume + 60) / 0.6);
+        volInput.value = sliderVal;
+      }
+
+      const dynInput = document.getElementById('dynamics-slider');
+      if (dynInput) {
+        dynInput.value = Math.round(dsp.velocity * 100);
+      }
+
+      // 4. ADSR slider values
+      const aSlider = document.getElementById('adsr-a');
+      if (aSlider) {
+        aSlider.value = Math.round(dsp.attack * 1000);
+        document.getElementById('a-val').textContent = dsp.attack.toFixed(2) + 's';
+      }
+      const dSlider = document.getElementById('adsr-d');
+      if (dSlider) {
+        dSlider.value = Math.round(dsp.decay * 1000);
+        document.getElementById('d-val').textContent = dsp.decay.toFixed(2) + 's';
+      }
+      const sSlider = document.getElementById('adsr-s');
+      if (sSlider) {
+        sSlider.value = Math.round(dsp.sustain * 100);
+        document.getElementById('s-val').textContent = Math.round(dsp.sustain * 100) + '%';
+      }
+      const rSlider = document.getElementById('adsr-r');
+      if (rSlider) {
+        rSlider.value = Math.round(dsp.release * 1000);
+        document.getElementById('r-val').textContent = dsp.release.toFixed(2) + 's';
+      }
+
+      // 5. Active tab styles
+      const tab1 = document.getElementById('sc-tab-p1');
+      const tab2 = document.getElementById('sc-tab-p2');
+      if (currentTabPlayer === 1) {
+        tab1.classList.add('active');
+        tab2.classList.remove('active');
+      } else {
+        tab1.classList.remove('active');
+        tab2.classList.add('active');
+      }
+
+      drawADSR();
+    }
+
+    function triggerChordP1(notes) {
+      if (!p1ChordActive || !audioStarted) return;
+      if (p1Dsp.timbre === 'strings' && !samplersLoaded) return;
+
+      p1ChordActive.releaseAll();
+      if (!notes || notes.length === 0) return;
+
+      const vel = p1Dsp.velocity;
+      notes.forEach(note => {
+        p1ChordActive.triggerAttack(note, Tone.now(), vel);
+      });
+    }
+
+    function triggerChordP2(notes) {
+      if (!p2ChordActive || !audioStarted) return;
+      if (p2Dsp.timbre === 'strings' && !samplersLoaded) return;
+
+      p2ChordActive.releaseAll();
+      if (!notes || notes.length === 0) return;
+
+      const vel = p2Dsp.velocity;
+      notes.forEach(note => {
+        p2ChordActive.triggerAttack(note, Tone.now(), vel);
+      });
+    }
+
+    function silenceAll() {
+      for (const set of [p1Instruments, p2Instruments]) {
+        for (const key of Object.keys(set)) {
+          const inst = set[key];
+          if (inst.chord) inst.chord.releaseAll();
+          if (inst.arp) inst.arp.releaseAll();
+        }
+      }
+      p1PrevChordKey = null;
+      p2PrevChordKey = null;
+    }
+
+    // ===================================================================
+    // 6. ARPEGGIATOR / SEQUENCER
+    // ===================================================================
+    function runSequencerStep(time) {
+      if (!audioStarted) { seqStep = 0; return; }
+
+      const step = seqStep;
+      seqStep = (seqStep + 1) % 16;
+
+      // Player 1 Arpeggiator
+      if (p1StableRoot && p1StableRoot !== 'Stop' && p1StableQuality && p1Dsp.autoplayLevel > 0) {
+        if (!(p1Dsp.timbre === 'strings' && !samplersLoaded)) {
+          const pool = buildArpPool(p1StableRoot, p1StableQuality);
+          if (pool && pool.length) triggerArpNote(1, pool, step, time);
+        }
+      }
+
+      // Player 2 Arpeggiator (Duo mode only)
+      if (playMode === 'duo' && p2StableRoot && p2StableRoot !== 'Stop' && p2StableQuality && p2Dsp.autoplayLevel > 0) {
+        if (!(p2Dsp.timbre === 'strings' && !samplersLoaded)) {
+          const pool = buildArpPool(p2StableRoot, p2StableQuality);
+          if (pool && pool.length) triggerArpNote(2, pool, step, time);
+        }
+      }
+    }
+
+    function triggerArpNote(playerNum, pool, step, time) {
+      const dsp = playerNum === 1 ? p1Dsp : p2Dsp;
+      const arpActive = playerNum === 1 ? p1ArpActive : p2ArpActive;
+      if (!arpActive) return;
+
+      const n = pool.length;
+      const v = dsp.velocity;
+      const autoplayLevel = dsp.autoplayLevel;
+
+      if (autoplayLevel === 1) {
+        if (step % 4 === 0) {
+          const beat = (step / 4) % 4;
+          const spreadIdx = [
+            0,
+            Math.max(1, Math.floor(n / 4)),
+            Math.floor(n / 2),
+            Math.min(n - 1, Math.floor(n * 3 / 4))
+          ];
+          const idx = spreadIdx[beat] % n;
+          arpActive.triggerAttackRelease(pool[idx], "4n", time, v * 0.9);
+        }
+      } else if (autoplayLevel === 2) {
+        if (step % 2 === 0) {
+          const contour = [0, 1, 2, 3, 4, 3, 2, 1];
+          const idx = contour[(step / 2) % contour.length] % n;
+          arpActive.triggerAttackRelease(pool[idx], "8n", time, v * 0.85);
+        }
+      } else if (autoplayLevel === 3) {
+        const runMap = {
+          0: 0,  1: 2,  2: 4,  3: 5,
+          4: 6,         6: 5,  7: 4,
+          8: 3,  9: 5, 10: 7, 11: 6,
+          12: 4, 13: 6, 14: 8, 15: 7
+        };
+        if (step in runMap) {
+          const idx = runMap[step] % n;
+          if (step === 4 || step === 10 || step === 14) {
+            const hi = (idx + 2) % n;
+            arpActive.triggerAttackRelease([pool[idx], pool[hi]], "16n", time, v * 0.8);
+          } else {
+            arpActive.triggerAttackRelease(pool[idx], "16n", time, v * 0.9);
+          }
+        }
+      }
+    }
+
+    // ===================================================================
+    // 7. CANVAS & UI RENDERERS
+    // ===================================================================
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function drawPointerDot(lm, playerColor) {
+      const tipX = (1 - lm[LM.INDEX_TIP].x) * canvas.width;
+      const tipY = lm[LM.INDEX_TIP].y * canvas.height;
+      ctx.fillStyle = playerColor === '#00ff88' ? 'rgba(0, 255, 136, 0.85)' : 'rgba(255, 110, 199, 0.85)';
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, 11, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    function drawSkeleton(lm, playerColor) {
+      ctx.strokeStyle = playerColor;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      for (const [a, b] of BONES) {
+        ctx.beginPath();
+        ctx.moveTo(scrX(lm[a].x), scrY(lm[a].y));
+        ctx.lineTo(scrX(lm[b].x), scrY(lm[b].y));
+        ctx.stroke();
+      }
+      for (let i = 0; i < 21; i++) {
+        const px = scrX(lm[i].x), py = scrY(lm[i].y);
+        const tip = (i===4||i===8||i===12||i===16||i===20);
+        ctx.fillStyle = playerColor === '#00ff88' ? 'rgba(0,255,136,0.25)' : 'rgba(255,110,199,0.25)';
+        ctx.beginPath(); ctx.arc(px, py, tip?14:9, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = playerColor;
+        ctx.beginPath(); ctx.arc(px, py, tip?6:4, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    function drawFPS() {
+      const tx = canvas.width - 20;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      roundRect(tx - 70, BAR_H + 6, 74, 22, 4);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(200,200,200,0.75)';
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+      ctx.fillText(`${fps} FPS`, tx - 4, BAR_H + 10);
+    }
+
+    // ===================================================================
+    // 7.5 VISUAL EFFECTS LIBRARY (VFX ENGINE)
+    // ===================================================================
+    // ===================================================================
+    // 7.5  VFX WEBGL SHADER SYSTEM
+    // All chord-triggered effects run as GLSL fragment shaders on a
+    // transparent WebGL overlay canvas. Lifecycle: kill() zeros alpha
+    // instantly when chord changes — zero lingering guaranteed.
+    // ===================================================================
+    const CYAN = "0,255,196";
+    const PINK = "255,90,190";
+
+    const VFXShaderSystem = {
+      CYAN: "0,255,196",
+      PINK: "255,90,190",
+      activeEffect: null,
+      effectStartTime: 0,
+      effectAlpha: 0,
+      energy: { p1: 0.3, p2: 0.3, pulse: 0 },
+      mists: [],
+
+      smoothstep(edge0, edge1, x) {
+        const t = Math.min(Math.max((x - edge0) / (edge1 - edge0), 0.0), 1.0);
+        return t * t * (3.0 - 2.0 * t);
+      },
+
+      init() {
+        this.mists = [];
+        for (let i = 0; i < 16; i++) {
+          this.mists.push({
+            x: Math.random() * canvas.width,
+            y: canvas.height - 30 - Math.random() * 90,
+            r: 140 + Math.random() * 120,
+            cyan: i % 2 === 0,
+            vx: (Math.random() - 0.5) * 0.5,
+            vy: (Math.random() - 0.5) * 0.12,
+            a: 0.1 + Math.random() * 0.06
+          });
+        }
+        console.log('[VFX] Canvas 2D Visuals System Initialized');
+      },
+
+      trigger(name) {
+        this.activeEffect = name;
+        this.effectStartTime = performance.now();
+        this.effectAlpha = 0;
+      },
+
+      kill() {
+        this.activeEffect = null;
+        this.effectAlpha = 0.0;
+      },
+
+      render(ctx) {
+        const time = performance.now() / 1000.0;
+        const elapsed = time - this.effectStartTime / 1000.0;
+        this.effectAlpha = Math.min(1.0, elapsed * 4.0);
+
+        this.drawBeams(ctx, canvas.width, canvas.height, this.energy);
+
+        if (this.activeEffect) {
+          ctx.save();
+          if (this.activeEffect === 'heart') {
+            this.drawHeart(ctx, canvas.width, canvas.height, time, this.energy, this.effectAlpha);
+          } else if (this.activeEffect === 'firework') {
+            this.drawFirework(ctx, canvas.width, canvas.height, time, this.energy, this.effectAlpha);
+          } else if (this.activeEffect === 'rainbow') {
+            this.drawRainbow(ctx, canvas.width, canvas.height, time, this.energy, this.effectAlpha);
+          } else if (this.activeEffect === 'bioluminescent') {
+            this.drawBioluminescent(ctx, canvas.width, canvas.height, time, this.energy, this.effectAlpha);
+          } else if (this.activeEffect === 'tritone') {
+            this.drawTritone(ctx, canvas.width, canvas.height, time, this.energy, this.effectAlpha);
+          } else if (this.activeEffect === 'eclipse') {
+            this.drawEclipse(ctx, canvas.width, canvas.height, time, this.energy, this.effectAlpha);
+          } else if (this.activeEffect === 'yinyang') {
+            this.drawYinYang(ctx, canvas.width, canvas.height, time, this.energy, this.effectAlpha);
+          } else if (this.activeEffect === 'timefreeze') {
+            this.drawTimeFreeze(ctx, canvas.width, canvas.height, time, this.energy, this.effectAlpha);
+          } else if (this.activeEffect === 'shatter') {
+            this.drawShatter(ctx, canvas.width, canvas.height, time, this.energy, this.effectAlpha);
+          }
+          ctx.restore();
+        }
+
+        this.drawMist(ctx, canvas.width, canvas.height, this.energy);
+      },
+
+      drawBeams(ctx, w, h, energy) {
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+
+        if (playMode === 'single') {
+          // Single mode: accent-colored center glow
+          const hue = currentAccentHue || 145;
+          const intensity = 0.10 + energy.p1 * 0.18;
+          const grad = ctx.createRadialGradient(w/2, h*0.47, 0, w/2, h*0.47, w * 0.45);
+          grad.addColorStop(0, `hsla(${hue}, 80%, 65%, ${intensity})`);
+          grad.addColorStop(1, `hsla(${hue}, 80%, 65%, 0)`);
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, w, h);
+        } else {
+          const left = ctx.createLinearGradient(0, 0, w * 0.55, 0);
+          left.addColorStop(0, `rgba(${CYAN},${0.16 + energy.p1 * 0.22})`);
+          left.addColorStop(1, `rgba(${CYAN},0)`);
+          ctx.fillStyle = left;
+          ctx.fillRect(0, 0, w, h);
+
+          const right = ctx.createLinearGradient(w, 0, w * 0.45, 0);
+          right.addColorStop(0, `rgba(${PINK},${0.16 + energy.p2 * 0.22})`);
+          right.addColorStop(1, `rgba(${PINK},0)`);
+          ctx.fillStyle = right;
+          ctx.fillRect(0, 0, w, h);
+        }
+        ctx.restore();
+      },
+
+      drawMist(ctx, w, h, energy) {
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        for (const m of this.mists) {
+          m.x += m.vx;
+          m.y += m.vy;
+          if (m.x < -m.r) m.x = w + m.r;
+          if (m.x > w + m.r) m.x = -m.r;
+          if (m.y < h * 0.62) m.vy = Math.abs(m.vy);
+          if (m.y > h) m.vy = -Math.abs(m.vy);
+          const boost = m.cyan ? energy.p1 : energy.p2;
+          const alpha = m.a * (0.6 + boost * 0.9);
+          let color;
+          if (playMode === 'single') {
+            const hue = currentAccentHue || 145;
+            const hueShift = m.cyan ? 0 : 40;
+            color = `hsl(${hue + hueShift}, 70%, 60%)`;
+            const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r);
+            g.addColorStop(0, `hsla(${hue + hueShift}, 70%, 60%, ${alpha})`);
+            g.addColorStop(1, `hsla(${hue + hueShift}, 70%, 60%, 0)`);
+            ctx.fillStyle = g;
+          } else {
+            color = m.cyan ? CYAN : PINK;
+            const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r);
+            g.addColorStop(0, `rgba(${color},${alpha})`);
+            g.addColorStop(1, `rgba(${color},0)`);
+            ctx.fillStyle = g;
+          }
+          ctx.beginPath();
+          ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      },
+
+      heartPoint(t) {
+        const x = 16 * Math.pow(Math.sin(t), 3);
+        const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+        return [x / 16, y / 16];
+      },
+
+      drawHeart(ctx, w, h, time, energy, alphaVal) {
+        const cx = w / 2;
+        const cy = h * 0.47;
+        const activity = 0.5 + 0.5 * Math.max(energy.p1, energy.p2);
+        const breathe = 1 + Math.sin(time * 1.4) * 0.02 + energy.pulse * 0.08;
+        const scale = Math.min(w, h) * 0.24 * breathe;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.globalCompositeOperation = "lighter";
+
+        const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, scale * 2.1);
+        halo.addColorStop(0, `rgba(255,255,255,${(0.12 + energy.pulse * 0.2) * alphaVal})`);
+        halo.addColorStop(0.35, `rgba(${CYAN},${(0.06 + energy.p1 * 0.08) * alphaVal})`);
+        halo.addColorStop(0.65, `rgba(${PINK},${(0.06 + energy.p2 * 0.08) * alphaVal})`);
+        halo.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.arc(0, 0, scale * 2.1, 0, Math.PI * 2);
+        ctx.fill();
+
+        const grad = ctx.createLinearGradient(-scale, 0, scale, 0);
+        grad.addColorStop(0, `rgba(${CYAN},${0.9 * alphaVal})`);
+        grad.addColorStop(0.5, `rgba(220,255,255,${0.85 * alphaVal})`);
+        grad.addColorStop(1, `rgba(${PINK},${0.9 * alphaVal})`);
+
+        const LAYERS = 16;
+        const STEPS = 220;
+        for (let layer = 0; layer < LAYERS; layer++) {
+          const f = layer / (LAYERS - 1);
+          const s = scale * (1 - f * 0.82);
+          const rot = Math.sin(time * 0.5 + layer * 0.6) * 0.05 * (1 - f);
+          const wobble = 1 + Math.sin(time * 2 + layer) * 0.015;
+          const lineAlpha = (0.10 + (1 - f) * 0.35) * activity * alphaVal;
+
+          ctx.save();
+          ctx.rotate(rot);
+          ctx.lineWidth = (0.6 + (1 - f) * 2.4) * breathe;
+          ctx.strokeStyle = grad;
+          ctx.globalAlpha = lineAlpha;
+          ctx.shadowBlur = 18 + (1 - f) * 26;
+          ctx.shadowColor = layer % 2 === 0 ? `rgba(${CYAN},0.9)` : `rgba(${PINK},0.9)`;
+
+          ctx.beginPath();
+          for (let i = 0; i <= STEPS; i++) {
+            const t = (i / STEPS) * Math.PI * 2;
+            const [hx, hy] = this.heartPoint(t);
+            const noise = Math.sin(t * 7 + time * 3 + layer * 1.3) * 0.012 * (1 - f);
+            const px = (hx + noise) * s * wobble;
+            const py = (hy + noise) * s * wobble;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        const SPARKS = 46;
+        for (let i = 0; i < SPARKS; i++) {
+          const prog = (i / SPARKS + time * 0.12) % 1;
+          const t = prog * Math.PI * 2;
+          const [hx, hy] = this.heartPoint(t);
+          const ring = 0.82 + ((i * 0.37) % 0.18);
+          const px = hx * scale * ring;
+          const py = hy * scale * ring;
+          const sparkA = (0.4 + 0.6 * Math.sin(time * 4 + i)) * activity * alphaVal;
+          const isCyan = hx < 0;
+          const color = isCyan ? CYAN : PINK;
+          ctx.globalAlpha = sparkA;
+          ctx.shadowBlur = 12;
+          ctx.shadowColor = `rgba(${color},1)`;
+          ctx.fillStyle = `rgba(255,255,255,0.95)`;
+          ctx.beginPath();
+          ctx.arc(px, py, 1.4 + Math.sin(time * 5 + i) * 0.7, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
+      },
+
+      drawFirework(ctx, w, h, time, energy, alphaVal) {
+        const cx = w / 2;
+        const cy = h * 0.45;
+        const elapsed = time - this.effectStartTime / 1000.0;
+        const progress = Math.min(elapsed / 1.8, 1.0);
+        const fade = (1.0 - progress) * alphaVal;
+        if (fade <= 0.001) return;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.globalCompositeOperation = "lighter";
+
+        const RINGS = 8;
+        for (let r = 0; r < RINGS; r++) {
+          const rf = r / (RINGS - 1);
+          const baseRadius = progress * (120 + r * 30);
+          const STEPS = 120;
+          
+          ctx.save();
+          ctx.lineWidth = (0.8 + (1 - rf) * 2.0) * fade;
+          const grad = ctx.createRadialGradient(0, 0, baseRadius * 0.5, 0, 0, baseRadius * 1.2);
+          grad.addColorStop(0, `rgba(255, 255, 255, ${fade})`);
+          grad.addColorStop(0.3, `rgba(0, 255, 136, ${fade})`);
+          grad.addColorStop(0.7, `rgba(255, 110, 199, ${fade})`);
+          grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.strokeStyle = grad;
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = r % 2 === 0 ? "rgba(0, 255, 136, 0.8)" : "rgba(255, 110, 199, 0.8)";
+
+          ctx.beginPath();
+          for (let i = 0; i <= STEPS; i++) {
+            const angle = (i / STEPS) * Math.PI * 2;
+            const wobble = 1.0 + Math.sin(angle * 8 + time * 6 + r * 2.3) * 0.05 * (1.0 - progress);
+            const px = Math.cos(angle) * baseRadius * wobble;
+            const py = Math.sin(angle) * baseRadius * wobble;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        const RAYS = 32;
+        for (let i = 0; i < RAYS; i++) {
+          const angle = (i / RAYS) * Math.PI * 2;
+          const length = progress * (150 + Math.sin(i * 123.4) * 50);
+          ctx.save();
+          ctx.strokeStyle = `rgba(255, 255, 255, ${fade * 0.6})`;
+          ctx.lineWidth = 1.2;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = `rgba(${CYAN}, 0.8)`;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          let px = 0, py = 0;
+          const raySteps = 6;
+          for (let j = 1; j <= raySteps; j++) {
+            const stepLen = (j / raySteps) * length;
+            const drift = Math.sin(j * 1.5 + time * 12 + i) * 6 * (1.0 - progress);
+            px = Math.cos(angle) * stepLen - Math.sin(angle) * drift;
+            py = Math.sin(angle) * stepLen + Math.cos(angle) * drift;
+            ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+
+          ctx.fillStyle = "#ffffff";
+          ctx.shadowColor = "#ffffff";
+          ctx.beginPath();
+          ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        const bloom = ctx.createRadialGradient(0, 0, 0, 0, 0, 50 * (1.0 - progress));
+        bloom.addColorStop(0, `rgba(255, 255, 255, ${fade})`);
+        bloom.addColorStop(0.4, `rgba(${CYAN}, ${fade * 0.6})`);
+        bloom.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = bloom;
+        ctx.beginPath();
+        ctx.arc(0, 0, 50 * (1.0 - progress), 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      },
+
+      drawRainbow(ctx, w, h, time, energy, alphaVal) {
+        const elapsed = time - this.effectStartTime / 1000.0;
+        const fade = Math.min(1.0, elapsed * 2.0) * (1.0 - this.smoothstep(3.2, 4.0, elapsed)) * alphaVal;
+        if (fade <= 0.001) return;
+
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+
+        const cx = w / 2;
+        const cy = h * 0.72;
+        const startRad = Math.min(w, h) * 0.52;
+        const BANDS = 7;
+        const ROYGBIV = [
+          "255, 26, 5",
+          "255, 133, 5",
+          "255, 245, 5",
+          "26, 255, 13",
+          "13, 89, 255",
+          "89, 13, 230",
+          "184, 13, 255"
+        ];
+
+        for (let b = 0; b < BANDS; b++) {
+          const r = startRad + b * 11;
+          const colorStr = ROYGBIV[b];
+          const STEPS = 100;
+          ctx.save();
+          ctx.strokeStyle = `rgba(${colorStr}, ${fade * 0.85})`;
+          ctx.lineWidth = 4.5 - b * 0.2;
+          ctx.shadowBlur = 14;
+          ctx.shadowColor = `rgba(${colorStr}, 0.9)`;
+
+          ctx.beginPath();
+          for (let i = 0; i <= STEPS; i++) {
+            const angle = Math.PI + (i / STEPS) * Math.PI;
+            const wobble = Math.sin(angle * 12 + time * 5.0 + b * 1.5) * 4.5 * (1.0 - b / BANDS);
+            const px = cx + Math.cos(angle) * (r + wobble);
+            const py = cy + Math.sin(angle) * (r + wobble);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        ctx.save();
+        ctx.strokeStyle = `rgba(0, 180, 255, ${fade * 0.28})`;
+        ctx.lineWidth = 1.0;
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = `rgba(${this.CYAN}, 0.8)`;
+        const STREAKS = 28;
+        for (let s = 0; s < STREAKS; s++) {
+          const fraction = s / (STREAKS - 1);
+          const angle = Math.PI + fraction * Math.PI;
+          const rx = cx + Math.cos(angle) * (startRad + 35);
+          const py = cy + Math.sin(angle) * (startRad + 35);
+
+          if (py < h * 0.68) {
+            const streakLen = 45 + Math.sin(s * 1.7 + time * 8) * 25;
+            ctx.beginPath();
+            ctx.moveTo(rx, py);
+            ctx.lineTo(rx + Math.sin(time + s) * 3, py + streakLen);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+
+        ctx.restore();
+      },
+
+      drawBioluminescent(ctx, w, h, time, energy, alphaVal) {
+        const elapsed = time - this.effectStartTime / 1000.0;
+        const boltFade = (1.0 - this.smoothstep(1.0, 2.0, elapsed)) * alphaVal;
+        const poolFade = this.smoothstep(0.25, 1.2, elapsed) * (1.0 - this.smoothstep(3.2, 4.0, elapsed)) * alphaVal;
+
+        const startX = w * 0.25;
+        const startY = h * 0.35;
+        const endX = w / 2;
+        const endY = h - 40;
+
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+
+        if (boltFade > 0.001) {
+          const BOLT_LAYERS = 3;
+          for (let l = 0; l < BOLT_LAYERS; l++) {
+            ctx.save();
+            ctx.strokeStyle = l === 0 ? "#ffffff" : `rgba(${this.CYAN}, 0.95)`;
+            ctx.lineWidth = l === 0 ? 2.5 : 4.5 - l * 1.0;
+            ctx.shadowBlur = 18;
+            ctx.shadowColor = `rgba(${this.CYAN}, 0.95)`;
+
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            
+            let cx = startX;
+            let cy = startY;
+            const segments = 16;
+            for (let i = 1; i <= segments; i++) {
+              const f = i / segments;
+              const tx = startX + (endX - startX) * f;
+              const ty = startY + (endY - startY) * f;
+              
+              const displace = 45 * (1.0 - f) * boltFade;
+              const dx = (Math.random() - 0.5) * displace;
+              const dy = (Math.random() - 0.5) * displace;
+
+              cx = tx + dx;
+              cy = ty + dy;
+              ctx.lineTo(cx, cy);
+            }
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        if (poolFade > 0.001) {
+          const poolCx = endX;
+          const poolCy = endY;
+          const WAVES = 6;
+
+          for (let wIdx = 0; wIdx < WAVES; wIdx++) {
+            const wf = wIdx / (WAVES - 1);
+            const baseRadX = 140 + wIdx * 25;
+            const baseRadY = 35 + wIdx * 8;
+            const STEPS = 80;
+
+            ctx.save();
+            ctx.strokeStyle = `rgba(${this.CYAN}, ${poolFade * (0.8 - wf * 0.4)})`;
+            ctx.lineWidth = 2.5 - wf * 1.0;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = `rgba(${this.CYAN}, 0.8)`;
+
+            ctx.beginPath();
+            for (let i = 0; i <= STEPS; i++) {
+              const angle = (i / STEPS) * Math.PI * 2;
+              const waveWobble = 1.0 + Math.sin(angle * 6 + time * 4 + wIdx) * 0.08 * poolFade;
+              const px = poolCx + Math.cos(angle) * baseRadX * waveWobble;
+              const py = poolCy + Math.sin(angle) * baseRadY * waveWobble;
+              if (i === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          const ORGANISMS = 12;
+          for (let o = 0; o < ORGANISMS; o++) {
+            const ox = poolCx + Math.sin(o * 42.4) * 110;
+            const oy = poolCy - 15 - ((o * 7 + time * 18) % 65);
+            const size = 1.8 + Math.sin(time * 3 + o) * 0.7;
+            const oAlpha = poolFade * (1.0 - ((poolCy - 15 - oy) / 65));
+
+            ctx.save();
+            ctx.fillStyle = `rgba(255, 255, 255, ${oAlpha})`;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = `rgba(${this.CYAN}, 1)`;
+            ctx.beginPath();
+            ctx.arc(ox, oy, size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+
+        ctx.restore();
+      },
+
+      drawTritone(ctx, w, h, time, energy, alphaVal) {
+        const elapsed = time - this.effectStartTime / 1000.0;
+        const fade = (1.0 - this.smoothstep(2.0, 3.0, elapsed)) * alphaVal;
+        if (fade <= 0.001) return;
+
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+
+        const fx = w / 2;
+        const LAYERS = 6;
+        const chromaticOffset = 7 * fade;
+
+        for (let l = 0; l < LAYERS; l++) {
+          const isCyan = l % 2 === 0;
+          const colorStr = isCyan ? this.CYAN : this.PINK;
+          const offset = isCyan ? -chromaticOffset : chromaticOffset;
+
+          ctx.save();
+          ctx.strokeStyle = `rgba(${colorStr}, ${fade * 0.75})`;
+          ctx.lineWidth = 2.0;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = `rgba(${colorStr}, 0.8)`;
+
+          ctx.beginPath();
+          let currentY = 0;
+          ctx.moveTo(fx + offset, currentY);
+
+          const stepY = 12;
+          while (currentY < h) {
+            currentY += stepY;
+            const wobble = Math.sin(currentY * 0.03 + time * 18.0 + l) * 15 * fade;
+            const jitter = (Math.random() - 0.5) * 4.5 * fade;
+            ctx.lineTo(fx + offset + wobble + jitter, currentY);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        if (Math.random() < 0.28) {
+          const blockH = 14 + Math.random() * 20;
+          const blockY = Math.random() * h;
+          const blockW = 80 + Math.random() * 120;
+          const blockX = fx - blockW / 2 + (Math.random() - 0.5) * 40;
+
+          ctx.save();
+          ctx.fillStyle = Math.random() < 0.5 ? `rgba(${this.CYAN}, 0.22)` : `rgba(${this.PINK}, 0.22)`;
+          ctx.fillRect(blockX, blockY, blockW, blockH);
+          ctx.restore();
+        }
+
+        if (Math.random() < 0.18) {
+          ctx.font = "bold 11px Courier New, monospace";
+          ctx.fillStyle = Math.random() < 0.5 ? `rgba(${this.CYAN}, 0.85)` : `rgba(${this.PINK}, 0.85)`;
+          ctx.fillText("0x4F_TRITONE_ERR", fx + (Math.random() - 0.5) * 80, Math.random() * h);
+        }
+
+        ctx.restore();
+      },
+
+      drawEclipse(ctx, w, h, time, energy, alphaVal) {
+        const elapsed = time - this.effectStartTime / 1000.0;
+        const fade = Math.min(1.0, elapsed * 2.0) * (1.0 - this.smoothstep(3.2, 4.0, elapsed)) * alphaVal;
+        if (fade <= 0.001) return;
+
+        const cx = w / 2;
+        const cy = h * 0.45;
+        const scale = Math.min(w, h) * 0.12;
+
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+
+        ctx.fillStyle = `rgba(5, 4, 10, ${fade * 0.65})`;
+        ctx.fillRect(0, 0, w, h);
+
+        const CORONA_LAYERS = 10;
+        const GOLD = "255, 205, 50";
+        for (let l = 0; l < CORONA_LAYERS; l++) {
+          const lf = l / (CORONA_LAYERS - 1);
+          const r = scale * (1.08 + lf * 0.45);
+          const STEPS = 120;
+
+          ctx.save();
+          ctx.strokeStyle = `rgba(${GOLD}, ${fade * (0.6 - lf * 0.4)})`;
+          ctx.lineWidth = 1.8;
+          ctx.shadowBlur = 12;
+          ctx.shadowColor = `rgba(${GOLD}, 0.8)`;
+
+          ctx.beginPath();
+          for (let i = 0; i <= STEPS; i++) {
+            const angle = (i / STEPS) * Math.PI * 2;
+            const wobble = 1.0 + Math.sin(angle * 14 + time * 6.0 + l * 2.1) * 0.08 * (1.0 - lf);
+            const px = cx + Math.cos(angle) * r * wobble;
+            const py = cy + Math.sin(angle) * r * wobble;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        const diamondAng = Math.PI * 0.28 + time * 0.4;
+        const dx = cx + Math.cos(diamondAng) * scale;
+        const dy = cy + Math.sin(diamondAng) * scale;
+        const diamondG = ctx.createRadialGradient(dx, dy, 0, dx, dy, 32);
+        diamondG.addColorStop(0, `rgba(255, 255, 255, ${fade})`);
+        diamondG.addColorStop(0.3, `rgba(255, 235, 180, ${fade * 0.7})`);
+        diamondG.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = diamondG;
+        ctx.beginPath();
+        ctx.arc(dx, dy, 32, 0, Math.PI * 2);
+        ctx.fill();
+
+        const STARS = 18;
+        for (let s = 0; s < STARS; s++) {
+          const sx = Math.sin(s * 41.3) * w * 0.42 + cx;
+          const sy = Math.cos(s * 17.8) * h * 0.42 + cy;
+          const sA = fade * (0.35 + 0.65 * Math.sin(time * 3.5 + s));
+          ctx.fillStyle = `rgba(255, 255, 255, ${sA})`;
+          ctx.beginPath();
+          ctx.arc(sx, sy, 1.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.fillStyle = "#050409";
+        ctx.beginPath();
+        ctx.arc(cx, cy, scale, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      },
+
+      drawYinYang(ctx, w, h, time, energy, alphaVal) {
+        const elapsed = time - this.effectStartTime / 1000.0;
+        const fade = (1.0 - this.smoothstep(3.2, 4.0, elapsed)) * alphaVal;
+        if (fade <= 0.001) return;
+
+        const cx = w / 2;
+        const cy = h * 0.52;
+        const orbitR = Math.min(w, h) * 0.15;
+        const speed = time * 1.5;
+
+        const ox1 = cx + Math.cos(speed) * orbitR;
+        const oy1 = cy + Math.sin(speed) * orbitR;
+
+        const ox2 = cx + Math.cos(speed + Math.PI) * orbitR;
+        const oy2 = cy + Math.sin(speed + Math.PI) * orbitR;
+
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+
+        const ARMS = 2;
+        const ORANGE = "255, 110, 20";
+        for (let a = 0; a < ARMS; a++) {
+          const baseAng = speed + a * Math.PI;
+          const colorStr = a === 0 ? ORANGE : this.CYAN;
+          ctx.save();
+          ctx.strokeStyle = `rgba(${colorStr}, ${fade * 0.52})`;
+          ctx.lineWidth = 2.0;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = `rgba(${colorStr}, 0.8)`;
+
+          ctx.beginPath();
+          const STEPS = 60;
+          for (let i = 0; i <= STEPS; i++) {
+            const f = i / STEPS;
+            const r = f * orbitR * 1.4;
+            const ang = baseAng + f * Math.PI * 1.8;
+            const wobble = Math.sin(f * 20 + time * 8) * 5 * (1.0 - f);
+            const px = cx + Math.cos(ang) * (r + wobble);
+            const py = cy + Math.sin(ang) * (r + wobble);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        this.drawFilamentOrb(ctx, ox1, oy1, 26, ORANGE, time, fade);
+        this.drawFilamentOrb(ctx, ox2, oy2, 26, this.CYAN, time, fade);
+
+        const gCenter = ctx.createRadialGradient(cx, cy, 0, cx, cy, 25);
+        gCenter.addColorStop(0, `rgba(255, 255, 255, ${fade})`);
+        gCenter.addColorStop(0.5, `rgba(${ORANGE}, ${fade * 0.4})`);
+        gCenter.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = gCenter;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 25, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      },
+
+      drawFilamentOrb(ctx, x, y, size, colorStr, time, fade) {
+        ctx.save();
+        ctx.translate(x, y);
+
+        const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 2.2);
+        halo.addColorStop(0, `rgba(255,255,255,${fade * 0.4})`);
+        halo.addColorStop(0.4, `rgba(${colorStr},${fade * 0.2})`);
+        halo.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.arc(0, 0, size * 2.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        const LAYERS = 6;
+        const STEPS = 40;
+        for (let l = 0; l < LAYERS; l++) {
+          const lf = l / (LAYERS - 1);
+          const r = size * (1.0 - lf * 0.65);
+          const rot = time * 0.8 + l * 0.8;
+          ctx.save();
+          ctx.rotate(rot);
+          ctx.strokeStyle = `rgba(${colorStr}, ${fade * 0.85})`;
+          ctx.lineWidth = 1.5;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = `rgba(${colorStr}, 0.9)`;
+
+          ctx.beginPath();
+          for (let i = 0; i <= STEPS; i++) {
+            const angle = (i / STEPS) * Math.PI * 2;
+            const wobble = 1.0 + Math.sin(angle * 5 + time * 12 + l) * 0.08 * (1.0 - lf);
+            const px = Math.cos(angle) * r * wobble;
+            const py = Math.sin(angle) * r * wobble;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+        ctx.restore();
+      },
+
+      drawTimeFreeze(ctx, w, h, time, energy, alphaVal) {
+        const elapsed = time - this.effectStartTime / 1000.0;
+        const fade = (1.0 - this.smoothstep(2.5, 3.5, elapsed)) * alphaVal;
+        if (fade <= 0.001) return;
+
+        const cx = w / 2;
+        const cy = h / 2;
+
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+
+        const SPOKES = 12;
+        ctx.strokeStyle = `rgba(${this.CYAN}, ${fade * 0.28})`;
+        ctx.lineWidth = 1.0;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = `rgba(${this.CYAN}, 0.8)`;
+        for (let i = 0; i < SPOKES; i++) {
+          const angle = (i / SPOKES) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+
+          const rSteps = 6;
+          const maxR = Math.max(w, h) * 0.6;
+          for (let j = 1; j <= rSteps; j++) {
+            const dist = (j / rSteps) * maxR;
+            const wobble = Math.sin(j * 1.5 + time * 4.0 + i) * 12;
+            const px = cx + Math.cos(angle) * dist - Math.sin(angle) * wobble;
+            const py = cy + Math.sin(angle) * dist + Math.cos(angle) * wobble;
+            ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+        }
+
+        const hexSize = 65;
+        const rows = Math.ceil(h / (hexSize * 1.5)) + 1;
+        const cols = Math.ceil(w / (hexSize * 1.73)) + 1;
+
+        ctx.strokeStyle = `rgba(${this.CYAN}, ${fade * 0.16})`;
+        ctx.lineWidth = 1.0;
+        for (let r = -1; r <= rows; r++) {
+          for (let c = -1; c <= cols; c++) {
+            const hx = c * hexSize * 1.732 + (r % 2 === 0 ? (hexSize * 1.732) / 2 : 0);
+            const hy = r * hexSize * 1.5;
+
+            ctx.beginPath();
+            for (let i = 0; i <= 6; i++) {
+              const angle = (i / 6) * Math.PI * 2 + Math.PI / 6;
+              const wobble = 1.0 + Math.sin(angle * 3 + time * 3) * 0.05 * fade;
+              const px = hx + Math.cos(angle) * hexSize * wobble;
+              const py = hy + Math.sin(angle) * hexSize * wobble;
+              if (i === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+          }
+        }
+
+        const CRYSTALS = 10;
+        for (let i = 0; i < CRYSTALS; i++) {
+          const cx_i = cx + Math.sin(i * 31.4) * w * 0.35;
+          const cy_i = cy - ((i * 12 + time * 12) % (h * 0.8)) + h * 0.4;
+          ctx.save();
+          ctx.translate(cx_i, cy_i);
+          ctx.strokeStyle = `rgba(255, 255, 255, ${fade * 0.45})`;
+          ctx.lineWidth = 1.0;
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = `rgba(${this.CYAN}, 0.8)`;
+          ctx.beginPath();
+          const sz = 6 + Math.sin(time + i) * 2;
+          ctx.moveTo(0, -sz);
+          ctx.lineTo(sz, 0);
+          ctx.lineTo(0, sz);
+          ctx.lineTo(-sz, 0);
+          ctx.closePath();
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        ctx.restore();
+      },
+
+      drawShatter(ctx, w, h, time, energy, alphaVal) {
+        const elapsed = time - this.effectStartTime / 1000.0;
+        const fade = (1.0 - this.smoothstep(1.5, 2.5, elapsed)) * alphaVal;
+        if (fade <= 0.001) return;
+
+        const cx = w / 2;
+        const cy = h * 0.4;
+
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+
+        const SHARDS = 8;
+        for (let i = 0; i < SHARDS; i++) {
+          const angle = (i / SHARDS) * Math.PI * 2 + i * 0.4;
+          const speed = 120 + (i % 3) * 50;
+          const shardDist = elapsed * speed;
+          const sx = cx + Math.cos(angle) * shardDist;
+          const sy = cy + Math.sin(angle) * shardDist;
+          const size = 22 + (i % 2) * 8;
+          const spin = time * 3.5 + i * 2.1;
+
+          ctx.save();
+          ctx.translate(sx, sy);
+          ctx.rotate(spin);
+
+          const colorStr = i % 2 === 0 ? this.CYAN : this.PINK;
+          ctx.strokeStyle = `rgba(${colorStr}, ${fade * 0.85})`;
+          ctx.lineWidth = 1.8;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = `rgba(${colorStr}, 0.9)`;
+
+          for (let l = 0; l < 3; l++) {
+            const s = size * (1.0 - l * 0.28);
+            ctx.beginPath();
+            for (let j = 0; j <= 3; j++) {
+              const a = (j / 3) * Math.PI * 2 - Math.PI / 2;
+              const wobble = 1.0 + Math.sin(a * 4 + time * 12 + i) * 0.08;
+              const px = Math.cos(a) * s * wobble;
+              const py = Math.sin(a) * s * wobble;
+              if (j === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        ctx.strokeStyle = `rgba(255, 255, 255, ${fade * 0.55})`;
+        ctx.lineWidth = 1.2;
+        const CRACKS = 10;
+        for (let c = 0; c < CRACKS; c++) {
+          const cAng = (c / CRACKS) * Math.PI * 2 + Math.sin(c + time) * 0.2;
+          const cLen = elapsed * 180 * (0.8 + Math.cos(c * 12.3) * 0.2);
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          let px = cx, py = cy;
+          const steps = 4;
+          for (let s = 1; s <= steps; s++) {
+            const fraction = s / steps;
+            const currentLen = fraction * cLen;
+            const offset = Math.sin(s * 1.5 + time * 15 + c) * 6;
+            px = cx + Math.cos(cAng) * currentLen - Math.sin(cAng) * offset;
+            py = cy + Math.sin(cAng) * currentLen + Math.cos(cAng) * offset;
+            ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+    };
+
+    // ===================================================================
+    // 7.7  VFX TRIGGER WRAPPERS (thin shims → VFXShaderSystem)
+    // ===================================================================
+    function trigger_PerfectFifthFirework()        { VFXShaderSystem.trigger('firework');        }
+    function trigger_SameChordHeart()              { VFXShaderSystem.trigger('heart');           }
+    function trigger_RainbowMajorMinor()           { VFXShaderSystem.trigger('rainbow');         }
+    function trigger_EclipseMajorMaj7()            { VFXShaderSystem.trigger('eclipse');         }
+    function trigger_BioluminescentStormDom7Min7() { VFXShaderSystem.trigger('bioluminescent');  }
+    function trigger_TimeFreezeSus4Sus2()          { VFXShaderSystem.trigger('timefreeze');      }
+    function trigger_TritoneGlitchB_F()            { VFXShaderSystem.trigger('tritone');         }
+    function trigger_YinYangRootUnity()            { VFXShaderSystem.trigger('yinyang');         }
+    function trigger_ShatterMajorSecond()          { VFXShaderSystem.trigger('shatter');         }
+
+    // ===================================================================
+    // 7.8  DYNAMIC ACCENT COLOR SYSTEM
+    // ===================================================================
+    const NOTE_HUES = {
+      'C': 145, 'D': 210, 'E': 40, 'F': 280, 'G': 185, 'A': 55, 'B': 340, 'C5': 120
+    };
+
+    const QUALITY_DESCRIPTIONS = {
+      'Major': 'Bright & Full', 'Minor': 'Dark & Melancholic',
+      'Dom7': 'Tense & Drive', 'Min7': 'Cool & Floating',
+      'Maj7': 'Dreamy & Open', 'Dim': 'Dissonant & Edge',
+      'Sus4': 'Tension & Release', 'Sus2': 'Airy & Suspended'
+    };
+
+    let currentAccentHue = 145;
+
+    function updateAccentColor(root) {
+      if (!root || root === 'Stop') return;
+      const hue = NOTE_HUES[root] || 145;
+      if (hue === currentAccentHue) return;
+      currentAccentHue = hue;
+      document.body.style.setProperty('--accent-hue', hue);
+      // Update ambient center glow
+      const glow = document.querySelector('.amb-center-glow');
+      if (glow) glow.style.background = `radial-gradient(circle, hsla(${hue}, 60%, 68%, 0.12), transparent 68%)`;
+      // Update glyph bloom
+      const bloom = document.querySelector('.glyph-bloom');
+      if (bloom) bloom.style.background = `radial-gradient(circle, hsla(${hue}, 60%, 68%, 0.18), transparent 65%)`;
+    }
+
+    // ===================================================================
+    // 7.9  CHORD GLYPH SVG RENDERER (Single Player)
+    // ===================================================================
+    const ChordGlyphRenderer = {
+      currentChord: null,
+      container: null,
+      glyphInner: null,
+      glowFilter: `
+        <filter id="glyph-glow" x="-70%" y="-70%" width="240%" height="240%">
+          <feGaussianBlur stdDeviation="2.4" result="b1"/>
+          <feGaussianBlur stdDeviation="6" result="b2"/>
+          <feMerge><feMergeNode in="b2"/><feMergeNode in="b1"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <radialGradient id="glyph-aura" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="currentColor" stop-opacity="0.3"/>
+          <stop offset="60%" stop-color="currentColor" stop-opacity="0.06"/>
+          <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+        </radialGradient>`,
+
+      init() {
+        this.container = document.getElementById('chord-glyph-container');
+        this.glyphInner = this.container ? this.container.querySelector('.glyph-inner') : null;
+      },
+
+      // Build concentric echo paths (fractal-string style)
+      echoPath(d, count, minScale) {
+        let paths = '';
+        for (let i = 0; i < count; i++) {
+          const scale = minScale + ((1 - minScale) * i) / (count - 1);
+          const opacity = 0.30 + (i / (count - 1)) * 0.65;
+          const delay = i * 0.09;
+          paths += `<path d="${d}" transform="scale(${scale})" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" opacity="${opacity}" style="animation: glyphDrawOn 1s ${delay}s ease-in-out both"/>`;
+        }
+        return paths;
+      },
+
+      // Get SVG content for each chord type
+      getGlyph(quality) {
+        const BOLT = 'M10,-60 L-26,6 L-4,6 L-14,60 L30,-8 L6,-8 L22,-60 Z';
+        const CLOUD = 'M-46,16 C-64,16 -64,-8 -46,-12 C-48,-36 -16,-44 -2,-26 C6,-42 40,-38 40,-14 C58,-14 58,18 40,18 Z';
+        const CRESCENT = 'M22,-48 A48,48 0 1,0 22,48 A36,36 0 1,1 22,-48 Z';
+        const LEAF = 'M0,-58 C40,-32 40,32 0,58 C-40,32 -40,-32 0,-58 Z';
+        const HOURGLASS = 'M-34,-52 L34,-52 C34,-28 6,-6 0,0 C6,6 34,28 34,52 L-34,52 C-34,28 -6,6 0,0 C-6,-6 -34,-28 -34,-52 Z';
+        const CIRCLE = 'M0,-34 C22,-34 34,-22 34,0 C34,22 22,34 0,34 C-22,34 -34,22 -34,0 C-34,-22 -22,-34 0,-34 Z';
+
+        let inner = '';
+        let wrapClass = '';
+
+        switch (quality) {
+          case 'Major': { // Sun
+            inner = this.echoPath(CIRCLE, 3, 0.5);
+            // Rays
+            for (let i = 0; i < 10; i++) {
+              const a = (i * 36) * Math.PI / 180;
+              const c = Math.cos(a), s = Math.sin(a);
+              inner += `<path d="M${(c*44).toFixed(1)},${(s*44).toFixed(1)} L${(c*62).toFixed(1)},${(s*62).toFixed(1)}" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity="0.9" style="animation: glyphDrawOn 0.5s ${0.4+i*0.05}s ease-in-out both"/>`;
+            }
+            // Core
+            inner += '<circle cx="0" cy="0" r="16" fill="currentColor" opacity="0.85" style="animation: glyphFadeIn 0.6s 0.2s both"/>';
+            break;
+          }
+          case 'Dom7': { // Lightning bolt — flicker
+            inner = this.echoPath(BOLT, 6, 0.32);
+            wrapClass = 'glyph-flicker';
+            break;
+          }
+          case 'Minor': { // Rain cloud
+            inner = this.echoPath(CLOUD, 4, 0.45);
+            // Rain drops
+            for (let i = 0; i < 6; i++) {
+              const x = -40 + i * 16;
+              inner += `<line x1="${x}" y1="30" x2="${x-4}" y2="44" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.7" style="animation: glyphRain 1.3s ${i*0.15}s ease-in infinite"/>`;
+            }
+            break;
+          }
+          case 'Min7': { // Waves
+            for (let i = 0; i < 4; i++) {
+              inner += `<path d="M-64,0 Q-32,-30 0,0 T64,0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.7" style="animation: glyphWave 3s ${i*0.75}s ease-out infinite"/>`;
+            }
+            break;
+          }
+          case 'Dim': { // Black hole — spinning
+            for (let i = 0; i < 4; i++) {
+              const r = [18, 30, 44, 58][i];
+              inner += `<circle cx="0" cy="0" r="${r}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="${0.4+i*0.15}" style="animation: glyphDrawOn 1s ${i*0.12}s ease-in-out both"/>`;
+            }
+            inner += '<ellipse cx="0" cy="0" rx="64" ry="22" transform="rotate(-22)" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.9" style="animation: glyphDrawOn 1.2s 0.3s both"/>';
+            inner += '<circle cx="0" cy="0" r="8" fill="currentColor" style="animation: glyphPulse 2s infinite"/>';
+            wrapClass = 'glyph-spin';
+            break;
+          }
+          case 'Sus4': { // Hourglass
+            inner = this.echoPath(HOURGLASS, 5, 0.4);
+            inner += '<circle cx="0" cy="0" r="3.5" fill="currentColor" style="animation: glyphSandDrop 1.6s ease-in infinite"/>';
+            break;
+          }
+          case 'Sus2': { // Leaf — sway
+            inner = this.echoPath(LEAF, 5, 0.4);
+            inner += '<path d="M0,-52 L0,52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.8" style="animation: glyphDrawOn 1s 0.5s both"/>';
+            wrapClass = 'glyph-sway';
+            break;
+          }
+          case 'Maj7': // Crescent moon
+          default:
+            inner = this.echoPath(CRESCENT, 6, 0.34);
+            break;
+        }
+
+        const wrapOpen = wrapClass ? `<g class="${wrapClass}">` : '<g>';
+        const wrapClose = '</g>';
+
+        return `<svg viewBox="-100 -100 200 200" style="width:100%;height:100%;color:var(--accent-neon, hsl(145,95%,74%))" aria-label="${quality} glyph">
+          <defs>${this.glowFilter}</defs>
+          <circle cx="0" cy="0" r="96" fill="url(#glyph-aura)"/>
+          <g filter="url(#glyph-glow)">
+            ${wrapOpen}
+              <g stroke="currentColor">${inner}</g>
+            ${wrapClose}
+          </g>
+        </svg>`;
+      },
+
+      trigger(quality) {
+        if (!this.glyphInner || playMode !== 'single') return;
+        if (quality === this.currentChord) return;
+        this.currentChord = quality;
+
+        // Update glyph SVG shape (shape depends only on quality)
+        this.glyphInner.innerHTML = this.getGlyph(quality);
+        // Re-trigger entry animation
+        this.glyphInner.style.animation = 'none';
+        this.glyphInner.offsetHeight; // reflow
+        this.glyphInner.style.animation = 'glyphEntry 0.8s cubic-bezier(0.22, 1, 0.36, 1) both';
+      },
+
+      clear() {
+        if (!this.glyphInner) return;
+        this.currentChord = null;
+        this.glyphInner.innerHTML = '';
+      }
+    };
+
+
+    // ===================================================================
+    // 7.10  SOLO & ACCOMPANIMENT MODE (Fully Encapsulated & Feature-Complete)
+    // ===================================================================
+    const SoloAccompMode = {
+      // ── State ──
+      active: false,
+      initialized: false,
+
+      // Per-hand state (index 0 = hand 1, index 1 = hand 2)
+      hPitch:        [null, null],
+      hArtic:        ['glissando', 'glissando'],
+      hLastNoteTime: [0, 0],
+      hTrail:        [[], []],
+      hSnappedNote:  [null, null],   // Currently locked scale note per hand
+
+      noteDebounceMs: 60,
+      smoothExpr: [0.5, 0.5],
+      smoothReverb: 0.3,
+      scaleType: 'pentatonic',
+
+      maxTrailLength: 50,
+      trailLifeMs: 700,
+
+      // Per-hand color schemes: [glissando, fist, glissRGB, fistRGB, coreHex]
+      HAND_COLORS: [
+        { gliss: '#00ffc4', fist: '#ff6ec7', rgb: '0, 255, 196',   fistRgb: '255, 110, 199', core: '#b4fff0' },
+        { gliss: '#ffb800', fist: '#c77dff', rgb: '255, 184, 0',   fistRgb: '199, 125, 255', core: '#fff0c8' }
+      ],
+
+      // Audio Nodes (per-hand synths + gains, shared reverb bus)
+      hSynth: [null, null],
+      hGain:  [null, null],
+      soloReverbNode: null,
+      soloMasterVol: null,
+
+      // Scale definitions (C4→G5 range)
+      SCALES: {
+        pentatonic: ['C4','D4','E4','G4','A4','C5','D5','E5','G5'],
+        major:      ['C4','D4','E4','F4','G4','A4','B4','C5','D5','E5','F5','G5'],
+        minor:      ['C4','D4','Eb4','F4','G4','Ab4','Bb4','C5','D5','Eb5','F5','G5'],
+        blues:      ['C4','Eb4','F4','Gb4','G4','Bb4','C5','Eb5','F5','Gb5','G5']
+      },
+
+      // Frequency range for continuous glissando (C4 → G5 = 1.5 octaves)
+      FREQ_MIN: 261.63,  // C4
+      FREQ_MAX: 783.99,  // G5
+
+      // Screen safe zone: 5% padding on each side so edge notes aren't clipped
+      SCREEN_PAD: 0.05,
+
+      ENVELOPES: {
+        glissando: { attack: 0.18, decay: 0.5, sustain: 0.85, release: 1.0 },
+        legato:    { attack: 0.06, decay: 0.35, sustain: 0.7, release: 0.6 }
+      },
+
+      // ── Lazy Audio Graph Initialization ──
+      initAudio() {
+        if (this.initialized) return;
+        this.initialized = true;
+
+        // Shared Reverb & Volume Bus
+        this.soloReverbNode = new Tone.Reverb({ decay: 3.2, wet: 0.28, preDelay: 0.01 });
+        this.soloMasterVol = new Tone.Volume(-4);
+        this.soloReverbNode.chain(this.soloMasterVol, Tone.Destination);
+
+        // Per-hand warm string FMSynth
+        // Sine carrier + triangle modulator at low harmonicity = bowed-string character
+        const synthConfigs = [
+          { harm: 1.5, modIdx: 1.2, lpFreq: 2000 },   // Hand 1
+          { harm: 1.8, modIdx: 1.0, lpFreq: 1800 }    // Hand 2: slightly different color
+        ];
+
+        for (let h = 0; h < 2; h++) {
+          const cfg = synthConfigs[h];
+          this.hGain[h] = new Tone.Gain(0.5).connect(this.soloReverbNode);
+
+          // FMSynth for the warm, classy string tone
+          this.hSynth[h] = new Tone.FMSynth({
+            harmonicity: cfg.harm,
+            modulationIndex: cfg.modIdx,
+            oscillator: { type: 'sine' },
+            modulation: { type: 'triangle' },
+            envelope: { attack: 0.2, decay: 0.6, sustain: 0.8, release: 1.2 },
+            modulationEnvelope: { attack: 0.3, decay: 0.4, sustain: 0.6, release: 0.8 },
+            volume: -4
+          }).connect(this.hGain[h]);
+
+          // Add a gentle lowpass to tame any brightness
+          // Note: FMSynth doesn't have a built-in filter, so we insert one in the chain
+          // Actually, let's reconnect through a filter
+          this.hSynth[h].disconnect();
+          const lpf = new Tone.Filter({ frequency: cfg.lpFreq, type: 'lowpass', rolloff: -12 });
+          this.hSynth[h].connect(lpf);
+          lpf.connect(this.hGain[h]);
+        }
+
+        console.log('[SoloAccompMode] Dual-Hand String Engine Initialized');
+      },
+
+      // ── Spatial Mapping Functions ──
+      // Remap raw screen X [0,1] into padded range [PAD, 1-PAD] → [0,1]
+      _unpadX(xNorm) {
+        return Math.max(0, Math.min(1, (xNorm - this.SCREEN_PAD) / (1 - 2 * this.SCREEN_PAD)));
+      },
+
+      // Continuous X → frequency for glissando
+      mapXToFreq(xNorm) {
+        const x = this._unpadX(xNorm);
+        return this.FREQ_MIN * Math.pow(this.FREQ_MAX / this.FREQ_MIN, x);
+      },
+
+      // Discrete X → scale note for legato (fist)
+      mapXToPitch(xNorm) {
+        const scale = this.SCALES[this.scaleType] || this.SCALES.pentatonic;
+        const x = this._unpadX(xNorm);
+        const index = Math.round(x * (scale.length - 1));
+        return scale[index];
+      },
+
+      // Note name → frequency (e.g. 'C4' → 261.63)
+      noteNameToFreq(name) {
+        const SEMITONES = {'C':0,'C#':1,'Db':1,'D':2,'D#':3,'Eb':3,'E':4,'F':5,'F#':6,'Gb':6,'G':7,'G#':8,'Ab':8,'A':9,'A#':10,'Bb':10,'B':11};
+        const m = name.match(/^([A-G][b#]?)(\d+)$/);
+        if (!m) return 440;
+        const midi = (parseInt(m[2]) + 1) * 12 + SEMITONES[m[1]];
+        return 440 * Math.pow(2, (midi - 69) / 12);
+      },
+
+      // Frequency → screen X position (padded, 0–1 normalized)
+      freqToScreenX(freq) {
+        const raw = Math.log(freq / this.FREQ_MIN) / Math.log(this.FREQ_MAX / this.FREQ_MIN);
+        return this.SCREEN_PAD + raw * (1 - 2 * this.SCREEN_PAD);
+      },
+
+      // X → display note name from raw frequency
+      freqToNoteName(freq) {
+        const NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+        const midi = Math.round(12 * Math.log2(freq / 440) + 69);
+        return NAMES[midi % 12] + (Math.floor(midi / 12) - 1);
+      },
+
+      // Y → volume with configurable contrast (per-hand smoothing)
+      mapYToVolume(y, contrast, handIdx) {
+        const raw = Math.max(0, Math.min(1, 1 - y));
+        const shaped = Math.pow(raw, contrast);
+        const vol = 0.04 + shaped * 0.92;
+        this.smoothExpr[handIdx] += (vol - this.smoothExpr[handIdx]) * 0.18;
+        if (this.hGain[handIdx]) {
+          this.hGain[handIdx].gain.rampTo(this.smoothExpr[handIdx], 0.04);
+        }
+        return this.smoothExpr[handIdx];
+      },
+
+      mapZToReverb(landmarks) {
+        const area = this.calcBoundingBoxArea(landmarks);
+        const normalizedFar = 1 - Math.max(0, Math.min(1, (area - 0.003) / 0.035));
+        const wet = 0.05 + normalizedFar * 0.88;
+        this.smoothReverb += (wet - this.smoothReverb) * 0.1;
+        if (this.soloReverbNode) {
+          this.soloReverbNode.wet.rampTo(this.smoothReverb, 0.1);
+        }
+        return this.smoothReverb;
+      },
+
+      calcBoundingBoxArea(landmarks) {
+        let minX = 1, maxX = 0, minY = 1, maxY = 0;
+        for (const lm of landmarks) {
+          if (lm.x < minX) minX = lm.x;
+          if (lm.x > maxX) maxX = lm.x;
+          if (lm.y < minY) minY = lm.y;
+          if (lm.y > maxY) maxY = lm.y;
+        }
+        return (maxX - minX) * (maxY - minY);
+      },
+
+      // ── Articulation Detection ──
+      detectArticulation(landmarks, handIdx) {
+        const idxE = fingerExtended(landmarks, LM.INDEX_TIP, LM.INDEX_PIP);
+        const midE = fingerExtended(landmarks, LM.MIDDLE_TIP, LM.MIDDLE_PIP);
+        const rngE = fingerExtended(landmarks, LM.RING_TIP, LM.RING_PIP);
+        const pnkE = fingerExtended(landmarks, LM.PINKY_TIP, LM.PINKY_PIP);
+
+        const allExtended = idxE && midE && rngE && pnkE;
+        const allCurled   = !idxE && !midE && !rngE && !pnkE;
+
+        if (allExtended) return 'glissando';
+        if (allCurled)   return 'legato';
+
+        return this.hArtic[handIdx];
+      },
+
+      applyArticulation(type, handIdx) {
+        if (type === this.hArtic[handIdx]) return;
+        this.hArtic[handIdx] = type;
+        const env = this.ENVELOPES[type];
+        const synth = this.hSynth[handIdx];
+        if (!env || !synth) return;
+
+        synth.envelope.attack = env.attack;
+        synth.envelope.decay = env.decay;
+        synth.envelope.sustain = env.sustain;
+        synth.envelope.release = env.release;
+
+        // HUD shows hand 1 articulation
+        if (handIdx === 0) {
+          const el = document.getElementById('sa-artic-display');
+          if (el) {
+            el.textContent = type === 'glissando' ? '✋ Glissando' : '👊 Legato';
+            el.className = 'sa-articulation ' + type;
+          }
+        }
+      },
+
+      // ── Note Lane Guide Overlay ──
+      drawNoteGuide(ctx, activeNoteNames) {
+        const scale = this.SCALES[this.scaleType] || this.SCALES.pentatonic;
+        const w = canvas.width;
+        const h = canvas.height;
+        const guideH = 52;
+        const baseY = h - guideH;
+        const activeList = activeNoteNames || [];
+
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+
+        // Subtle dark strip background for guide area
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(0, baseY, w, guideH);
+
+        ctx.font = '600 11px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+
+        for (let i = 0; i < scale.length; i++) {
+          const note = scale[i];
+          const freq = this.noteNameToFreq(note);
+          const xNorm = this.freqToScreenX(freq);
+          const x = xNorm * w;
+
+          // Lane boundaries (midpoints between this note and neighbours)
+          let laneLeft, laneRight;
+          if (i === 0) {
+            laneLeft = 0;
+          } else {
+            const prevFreq = this.noteNameToFreq(scale[i - 1]);
+            laneLeft = ((this.freqToScreenX(prevFreq) + xNorm) / 2) * w;
+          }
+          if (i === scale.length - 1) {
+            laneRight = w;
+          } else {
+            const nextFreq = this.noteNameToFreq(scale[i + 1]);
+            laneRight = ((xNorm + this.freqToScreenX(nextFreq)) / 2) * w;
+          }
+
+          // Display-friendly note name (strip octave number)
+          const displayName = note.replace(/\d+$/, '');
+          const isActive = activeList.includes(note);
+
+          // Active note highlight
+          if (isActive) {
+            ctx.globalAlpha = 0.12;
+            ctx.fillStyle = '#00ffc4';
+            ctx.fillRect(laneLeft, 0, laneRight - laneLeft, h);
+            ctx.globalAlpha = 0.45;
+          }
+
+          // Vertical hairline at note position
+          ctx.beginPath();
+          ctx.moveTo(x, baseY);
+          ctx.lineTo(x, baseY + guideH * 0.6);
+          ctx.strokeStyle = isActive ? 'rgba(0, 255, 196, 0.9)' : 'rgba(255, 255, 255, 0.25)';
+          ctx.lineWidth = isActive ? 2 : 1;
+          ctx.stroke();
+
+          // Note label
+          ctx.fillStyle = isActive ? '#00ffc4' : 'rgba(255, 255, 255, 0.55)';
+          ctx.fillText(displayName, x, baseY + guideH * 0.6 + 4);
+        }
+
+        ctx.restore();
+      },
+
+      // ── Glissando Trail Drawing (Smooth Bézier + Layered Glow + Time Fade) ──
+      drawGlissandoTrail(ctx, now, trail, colorRgb, coreHex) {
+        // Evict expired points
+        const cutoff = now - this.trailLifeMs;
+        while (trail.length > 0 && trail[0].t < cutoff) {
+          trail.shift();
+        }
+
+        if (trail.length < 3) return;
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Pass 1: Outer glow (wide, soft)
+        ctx.beginPath();
+        ctx.moveTo(trail[0].x, trail[0].y);
+        for (let i = 1; i < trail.length - 1; i++) {
+          const endX = (trail[i].x + trail[i + 1].x) / 2;
+          const endY = (trail[i].y + trail[i + 1].y) / 2;
+          ctx.quadraticCurveTo(trail[i].x, trail[i].y, endX, endY);
+        }
+        const last = trail[trail.length - 1];
+        ctx.lineTo(last.x, last.y);
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = `rgb(${colorRgb})`;
+        ctx.lineWidth = 10;
+        ctx.strokeStyle = `rgba(${colorRgb}, 0.15)`;
+        ctx.stroke();
+
+        // Pass 2: Segmented fade (opacity + width by age)
+        for (let i = 1; i < trail.length; i++) {
+          const prev = trail[i - 1];
+          const curr = trail[i];
+          const age = (now - curr.t) / this.trailLifeMs;
+          const alpha = Math.max(0, (1 - age) * 0.6);
+          const width = Math.max(0.5, (1 - age) * 6);
+
+          if (i < trail.length - 1) {
+            const next = trail[i + 1];
+            ctx.beginPath();
+            ctx.moveTo((prev.x + curr.x) / 2, (prev.y + curr.y) / 2);
+            ctx.quadraticCurveTo(curr.x, curr.y, (curr.x + next.x) / 2, (curr.y + next.y) / 2);
+          } else {
+            ctx.beginPath();
+            ctx.moveTo((prev.x + curr.x) / 2, (prev.y + curr.y) / 2);
+            ctx.lineTo(curr.x, curr.y);
+          }
+          ctx.strokeStyle = `rgba(${colorRgb}, ${alpha})`;
+          ctx.lineWidth = width;
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = `rgba(${colorRgb}, ${alpha * 0.6})`;
+          ctx.stroke();
+        }
+
+        // Pass 3: Bright core
+        ctx.beginPath();
+        ctx.moveTo(trail[0].x, trail[0].y);
+        for (let i = 1; i < trail.length - 1; i++) {
+          const endX = (trail[i].x + trail[i + 1].x) / 2;
+          const endY = (trail[i].y + trail[i + 1].y) / 2;
+          ctx.quadraticCurveTo(trail[i].x, trail[i].y, endX, endY);
+        }
+        ctx.lineTo(last.x, last.y);
+        ctx.strokeStyle = coreHex + 'b3'; // ~70% opacity
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = coreHex;
+        ctx.stroke();
+
+        ctx.restore();
+      },
+
+      // ── Process a Single Hand ──
+      processOneHand(hand, h, ctx, now, activeScaleNotes) {
+        const colors = this.HAND_COLORS[h];
+        const synth  = this.hSynth[h];
+        const wrist  = hand[LM.WRIST];
+        const mirroredX = Math.max(0, Math.min(1, 1 - wrist.x));
+
+        // Detect gesture
+        const artic = this.detectArticulation(hand, h);
+        this.applyArticulation(artic, h);
+
+        // Y-axis → volume
+        const contrast = artic === 'legato' ? 0.45 : 0.8;
+        const volLevel = this.mapYToVolume(wrist.y, contrast, h);
+
+        // Reverb from hand distance (shared)
+        this.mapZToReverb(hand);
+
+        // Screen position
+        const tipX = mirroredX * canvas.width;
+        const tipY = wrist.y * canvas.height;
+
+        if (synth) {
+          if (artic === 'glissando') {
+            // ✋ Open Palm: quantized glissando — snap to scale notes, slide between them
+            const targetFreq = this.mapXToFreq(mirroredX);
+            const snappedNote = this._findClosestScaleNote(targetFreq);
+            if (snappedNote) activeScaleNotes.push(snappedNote);
+
+            const snappedFreq = this.noteNameToFreq(snappedNote);
+            const prevSnapped = this.hSnappedNote[h];
+
+            if (!this.hPitch[h]) {
+              // First contact — trigger at snapped note
+              this.hSnappedNote[h] = snappedNote;
+              synth.triggerAttack(snappedFreq, Tone.now(), 0.75);
+              this.hPitch[h] = snappedNote;
+            } else if (snappedNote !== prevSnapped) {
+              // Moving to a different note — smooth slide
+              this.hSnappedNote[h] = snappedNote;
+              synth.frequency.rampTo(snappedFreq, 0.12);
+              this.hPitch[h] = snappedNote;
+            }
+            // Same note as before — hold steady, no frequency change (no microtones)
+
+            // Trail
+            this.hTrail[h].push({ x: tipX, y: tipY, t: now });
+            if (this.hTrail[h].length > this.maxTrailLength) this.hTrail[h].shift();
+            this.drawGlissandoTrail(ctx, now, this.hTrail[h], colors.rgb, colors.core);
+
+          } else {
+            // 👊 Closed Fist: discrete legato
+            const pitch = this.mapXToPitch(mirroredX);
+            activeScaleNotes.push(pitch);
+
+            if (pitch !== this.hPitch[h] && (now - this.hLastNoteTime[h]) > this.noteDebounceMs) {
+              this.hPitch[h] = pitch;
+              this.hSnappedNote[h] = pitch;
+              this.hLastNoteTime[h] = now;
+              try { synth.triggerRelease(Tone.now()); } catch(e) {}
+              synth.triggerAttack(pitch, Tone.now() + 0.012, volLevel);
+            }
+
+            this.hTrail[h] = [];
+          }
+        }
+
+        // Skeleton + cursor glow
+        const skColor = artic === 'glissando' ? colors.gliss : colors.fist;
+        drawSkeleton(hand, skColor);
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.beginPath();
+        ctx.arc(tipX, tipY, 16, 0, Math.PI * 2);
+        const glowRgb = artic === 'glissando' ? colors.rgb : colors.fistRgb;
+        ctx.fillStyle = `rgba(${glowRgb}, 0.2)`;
+        ctx.shadowBlur = 24;
+        ctx.shadowColor = skColor;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(tipX, tipY, 5, 0, Math.PI * 2);
+        ctx.fillStyle = skColor;
+        ctx.fill();
+        ctx.restore();
+
+        return this.hPitch[h];
+      },
+
+      // Closest scale note helper (shared)
+      _findClosestScaleNote(freq) {
+        const scale = this.SCALES[this.scaleType] || this.SCALES.pentatonic;
+        let closest = scale[0];
+        let minDiff = Infinity;
+        for (const note of scale) {
+          const diff = Math.abs(Math.log2(freq / this.noteNameToFreq(note)));
+          if (diff < minDiff) { minDiff = diff; closest = note; }
+        }
+        return closest;
+      },
+
+      // ── Main Frame Processing Loop ──
+      processFrame(results) {
+        if (!this.active) return;
+        const now = performance.now();
+
+        const hands = (results.multiHandLandmarks || []).slice(0, 2);
+        const activeScaleNotes = [];
+        let displayPitch = null;
+
+        // Process each detected hand
+        for (let h = 0; h < hands.length; h++) {
+          const pitch = this.processOneHand(hands[h], h, ctx, now, activeScaleNotes);
+          if (h === 0) displayPitch = pitch;
+        }
+
+        // Release synths for hands that disappeared
+        for (let h = hands.length; h < 2; h++) {
+          if (this.hPitch[h]) {
+            if (this.hSynth[h]) try { this.hSynth[h].triggerRelease(); } catch(e) {}
+            this.hPitch[h] = null;
+            this.hTrail[h] = [];
+          }
+        }
+
+        // HUD (show hand 1 info)
+        const noteEl = document.getElementById('sa-note-display');
+        if (noteEl) noteEl.textContent = displayPitch ? displayPitch.replace(/\d+$/, '') : '—';
+
+        // Note guide (highlight notes from both hands)
+        this.drawNoteGuide(ctx, activeScaleNotes);
+      },
+
+      activate() {
+        this.initAudio();
+        this.active = true;
+        this.hPitch = [null, null];
+        this.hArtic = ['glissando', 'glissando'];
+        this.hTrail = [[], []];
+        this.hLastNoteTime = [0, 0];
+        this.hSnappedNote = [null, null];
+        this.smoothExpr = [0.5, 0.5];
+        this.bindScaleSelector();
+        console.log('[SoloAccompMode] Dual-Hand String Engine Activated');
+      },
+
+      deactivate() {
+        this.active = false;
+        for (let h = 0; h < 2; h++) {
+          if (this.hSynth[h]) try { this.hSynth[h].triggerRelease(); } catch(e) {}
+          this.hPitch[h] = null;
+          this.hTrail[h] = [];
+        }
+        console.log('[SoloAccompMode] Deactivated');
+      },
+
+      bindScaleSelector() {
+        const btns = document.querySelectorAll('.sa-scale-btn');
+        btns.forEach(btn => {
+          const newBtn = btn.cloneNode(true);
+          btn.parentNode.replaceChild(newBtn, btn);
+          newBtn.addEventListener('click', () => {
+            document.querySelectorAll('.sa-scale-btn').forEach(b => b.classList.remove('active'));
+            newBtn.classList.add('active');
+            this.scaleType = newBtn.dataset.scale;
+          });
+        });
+      }
+    };
+
+    // ===================================================================
+    // 8. MEDIAPIPE ONRESULTS MAIN LOOP
+    // ===================================================================
+    function onResults(results) {
+      const now = performance.now();
+
+      // FPS Calculation
+      frameTick++;
+      if (now - fpsLastSec >= 1000) {
+        fps = frameTick;
+        frameTick = 0;
+        fpsLastSec = now;
+      }
+
+      // Draw mirrored video background
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.drawImage(videoEl, -canvas.width, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+
+
+      ctx.fillStyle = 'rgba(8,8,14,0.32)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // ── Solo & Accompaniment mode: delegate entirely to its own processor ──
+      if (playMode === 'solo_accomp') {
+        SoloAccompMode.processFrame(results);
+        // Still render ambient VFX (beams + mist)
+        VFXShaderSystem.render(ctx);
+        drawFPS();
+        return; // Skip all single/duo chord detection, HUD updates, etc.
+      }
+
+      // Partition hands based on active mode
+      let p1Hands = [];
+      let p1Handedness = [];
+      let p2Hands = [];
+      let p2Handedness = [];
+
+      if (playMode === 'duo') {
+        const partitioned = partitionHands(results);
+        p1Hands = partitioned.p1Hands;
+        p1Handedness = partitioned.p1Handedness;
+        p2Hands = partitioned.p2Hands;
+        p2Handedness = partitioned.p2Handedness;
+      } else {
+        // Single player mode: all detected hands map to Player 1
+        if (results.multiHandLandmarks) {
+          for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+            p1Hands.push(results.multiHandLandmarks[i]);
+            p1Handedness.push(results.multiHandedness[i]);
+          }
+        }
+        // Force silence player 2
+        if (p2ChordActive) p2ChordActive.releaseAll();
+        if (p2ArpActive) p2ArpActive.releaseAll();
+        p2StableRoot = null;
+        p2StableQuality = 'Major';
+        p2PrevChordKey = null;
+      }
+
+      // Subtle zone tints / overlays
+      if (playMode === 'duo') {
+        if (p1Hands.length > 0) {
+          ctx.fillStyle = 'rgba(0, 255, 136, 0.04)';
+          ctx.fillRect(0, 0, canvas.width / 2, canvas.height);
+        }
+        if (p2Hands.length > 0) {
+          ctx.fillStyle = 'rgba(255, 110, 199, 0.04)';
+          ctx.fillRect(canvas.width / 2, 0, canvas.width / 2, canvas.height);
+        }
+      } else {
+        if (p1Hands.length > 0) {
+          ctx.fillStyle = 'rgba(0, 255, 136, 0.03)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+
+      // ---- PROCESS PLAYER 1 ----
+      let rawRootP1 = null;
+      let rawQualityP1 = null;
+      let p1RightHandLm = null;
+
+      for (let i = 0; i < p1Hands.length; i++) {
+        const lm = p1Hands[i];
+        const info = p1Handedness[i];
+        if (info.label === 'Right') {
+          rawRootP1 = detectLeftGesture(lm, 'Left');
+        } else if (info.label === 'Left') {
+          rawQualityP1 = detectRightHandPointingForPlayer(lm, 1);
+          p1RightHandLm = lm;
+        }
+      }
+
+      // Debounce Player 1 Root
+      if (rawRootP1 !== p1LastRawRoot) { p1LastRawRoot = rawRootP1; p1RootSince = now; }
+      if (now - p1RootSince >= DEBOUNCE_ROOT_MS) {
+        if (rawRootP1 !== p1StableRoot) p1StableRoot = rawRootP1;
+      }
+
+      // Debounce Player 1 Quality (sticky behavior)
+      if (rawQualityP1 !== null) {
+        if (rawQualityP1 !== p1LastRawQuality) { p1LastRawQuality = rawQualityP1; p1QualitySince = now; }
+        if (now - p1QualitySince >= DEBOUNCE_QUALITY_MS) {
+          if (rawQualityP1 !== p1StableQuality) p1StableQuality = rawQualityP1;
+        }
+      }
+
+      // Draw Pointer dot on P1 pointing hand
+      if (p1RightHandLm && rawQualityP1) {
+        drawPointerDot(p1RightHandLm, '#00ff88');
+      }
+
+      // ---- PROCESS PLAYER 2 (Duo mode only) ----
+      let rawRootP2 = null;
+      let rawQualityP2 = null;
+      let p2RightHandLm = null;
+
+      if (playMode === 'duo') {
+        for (let i = 0; i < p2Hands.length; i++) {
+          const lm = p2Hands[i];
+          const info = p2Handedness[i];
+          if (info.label === 'Right') {
+            rawRootP2 = detectLeftGesture(lm, 'Left');
+          } else if (info.label === 'Left') {
+            rawQualityP2 = detectRightHandPointingForPlayer(lm, 2);
+            p2RightHandLm = lm;
+          }
+        }
+
+        // Debounce Player 2 Root
+        if (rawRootP2 !== p2LastRawRoot) { p2LastRawRoot = rawRootP2; p2RootSince = now; }
+        if (now - p2RootSince >= DEBOUNCE_ROOT_MS) {
+          if (rawRootP2 !== p2StableRoot) p2StableRoot = rawRootP2;
+        }
+
+        // Debounce Player 2 Quality (sticky behavior)
+        if (rawQualityP2 !== null) {
+          if (rawQualityP2 !== p2LastRawQuality) { p2LastRawQuality = rawQualityP2; p2QualitySince = now; }
+          if (now - p2QualitySince >= DEBOUNCE_QUALITY_MS) {
+            if (rawQualityP2 !== p2StableQuality) p2StableQuality = rawQualityP2;
+          }
+        }
+
+        // Draw Pointer dot on P2 pointing hand
+        if (p2RightHandLm && rawQualityP2) {
+          drawPointerDot(p2RightHandLm, '#ff6ec7');
+        }
+      }
+
+      // ---- AUDIO TRIGGER & SCOREBOARD CHECKS ----
+      let p1Fired = false;
+      const p1ChordKey = p1StableRoot + '_' + p1StableQuality;
+      if (p1ChordKey !== p1PrevChordKey) {
+        p1PrevChordKey = p1ChordKey;
+        const voicedNotes = voiceBlockChord(p1StableRoot, p1StableQuality);
+        triggerChordP1(voicedNotes);
+        if (p1StableRoot && p1StableRoot !== 'Stop') {
+          p1ChordsCount++;
+          p1Fired = true;
+        }
+      }
+
+      // Single-player glyph SVG shape update (shape only depends on quality)
+      if (playMode === 'single' && p1StableRoot && p1StableRoot !== 'Stop') {
+        ChordGlyphRenderer.trigger(p1StableQuality);
+        updateAccentColor(p1StableRoot);
+      } else if (playMode === 'single' && (!p1StableRoot || p1StableRoot === 'Stop')) {
+        ChordGlyphRenderer.clear();
+      }
+
+      let p2Fired = false;
+      if (playMode === 'duo') {
+        const p2ChordKey = p2StableRoot + '_' + p2StableQuality;
+        if (p2ChordKey !== p2PrevChordKey) {
+          p2PrevChordKey = p2ChordKey;
+          const voicedNotes = voiceBlockChord(p2StableRoot, p2StableQuality);
+          triggerChordP2(voicedNotes);
+          if (p2StableRoot && p2StableRoot !== 'Stop') {
+            p2ChordsCount++;
+            p2Fired = true;
+          }
+        }
+      }
+
+      if (p1Fired || p2Fired) {
+        VFXShaderSystem.energy.pulse = 1.0;
+      }
+
+      // Smoothly update player energy values based on hand presence and play state
+      const targetP1 = (p1Hands.length > 0 && p1StableRoot && p1StableRoot !== 'Stop') ? 1.0 : 0.0;
+      const targetP2 = (p2Hands.length > 0 && p2StableRoot && p2StableRoot !== 'Stop') ? 1.0 : 0.0;
+      VFXShaderSystem.energy.p1 += (targetP1 - VFXShaderSystem.energy.p1) * 0.08;
+      VFXShaderSystem.energy.p2 += (targetP2 - VFXShaderSystem.energy.p2) * 0.08;
+      VFXShaderSystem.energy.pulse *= 0.92;
+
+      // Collaborative Harmony check
+      const p1ChordName = chordDisplayName(p1StableRoot, p1StableQuality);
+      const p2ChordName = playMode === 'duo' ? chordDisplayName(p2StableRoot, p2StableQuality) : '—';
+      const currentHarmony = playMode === 'duo' ? checkHarmony(p1ChordName, p2ChordName) : null;
+
+      if (playMode === 'duo' && currentHarmony && currentHarmony !== lastTrackedHarmony) {
+        togetherHarmoniesCount++;
+        lastTrackedHarmony = currentHarmony;
+      }
+
+      // VFX Trigger Check
+      const p1Root = p1StableRoot;
+      const p1Qual = p1StableQuality;
+      const p2Root = playMode === 'duo' ? p2StableRoot : null;
+      const p2Qual = playMode === 'duo' ? p2StableQuality : null;
+
+      if (playMode === 'duo' && p1Root && p1Root !== 'Stop' && p2Root && p2Root !== 'Stop') {
+        const currentComboKey = `${p1Root}_${p1Qual}+${p2Root}_${p2Qual}`;
+        if (currentComboKey !== lastVfxComboKey) {
+          lastVfxComboKey = currentComboKey;
+          VFXShaderSystem.kill(); // kill previous visual immediately
+
+          const ri1 = p1Root === 'C5' ? 12 : NOTE_NAMES.indexOf(p1Root);
+          const ri2 = p2Root === 'C5' ? 12 : NOTE_NAMES.indexOf(p2Root);
+          const interval = Math.abs(ri1 - ri2) % 12;
+
+          // --- VFX Dispatch: priority order, each fires independently ---
+
+          // 1. EXACT SAME CHORD (root + quality) → Heart
+          if (p1Root === p2Root && p1Qual === p2Qual) {
+            trigger_SameChordHeart();
+          }
+          // 2. SAME ROOT, different quality → Yin-Yang vortex
+          else if (p1Root === p2Root && p1Qual !== p2Qual) {
+            trigger_YinYangRootUnity();
+          }
+          // 3. PERFECT FIFTH (interval 7 semitones) → Firework
+          else if (interval === 7 || interval === 5) {
+            trigger_PerfectFifthFirework();
+          }
+          // 4. TRITONE (interval 6 semitones) → Glitch fissure
+          else if (interval === 6) {
+            trigger_TritoneGlitchB_F();
+          }
+          // 5. MAJOR SECOND (interval 2) → Shatter
+          else if (interval === 2 || interval === 10) {
+            trigger_ShatterMajorSecond();
+          }
+          // 6. MAJOR + MINOR chord quality combo → Rainbow
+          else if ((p1Qual === 'Major' && p2Qual === 'Minor') || (p1Qual === 'Minor' && p2Qual === 'Major')) {
+            trigger_RainbowMajorMinor(p1Qual === 'Major' ? 1 : 2, p2Qual === 'Minor' ? 2 : 1);
+          }
+          // 7. MAJOR + MAJ7 → Eclipse
+          else if ((p1Qual === 'Major' && p2Qual === 'Maj7') || (p1Qual === 'Maj7' && p2Qual === 'Major')) {
+            trigger_EclipseMajorMaj7();
+          }
+          // 8. DOM7 + MIN7 → Bioluminescent Storm
+          else if ((p1Qual === 'Dom7' && p2Qual === 'Min7') || (p1Qual === 'Min7' && p2Qual === 'Dom7')) {
+            trigger_BioluminescentStormDom7Min7(p1Qual === 'Dom7' ? 1 : 2, p2Qual === 'Min7' ? 2 : 1);
+          }
+          // 9. SUS4 + SUS2 → Time Freeze
+          else if ((p1Qual === 'Sus4' && p2Qual === 'Sus2') || (p1Qual === 'Sus2' && p2Qual === 'Sus4')) {
+            trigger_TimeFreezeSus4Sus2();
+          }
+        }
+      } else {
+        if (lastVfxComboKey !== null) {
+          lastVfxComboKey = null;
+          VFXShaderSystem.kill(); // kill active shader instantly when combo ends
+        }
+      }
+
+      // ---- UPDATE DOM HUD ELEMENTS ----
+      const p1ChordLabelText = p1ChordName || '—';
+      const p2ChordLabelText = p2ChordName || '—';
+      
+      document.getElementById('p1-hud-chord').textContent = p1ChordLabelText;
+      document.getElementById('p1-chord-label').textContent = p1ChordLabelText;
+
+      // Update center glyph chord text every frame (single-player mode)
+      if (playMode === 'single') {
+        const glyphTextEl = document.getElementById('glyph-chord-text');
+        const glyphQualEl = document.getElementById('glyph-chord-quality');
+        if (p1StableRoot && p1StableRoot !== 'Stop') {
+          const displayRoot = p1StableRoot === 'C5' ? 'C' : p1StableRoot;
+          if (glyphTextEl) glyphTextEl.textContent = `${displayRoot} ${p1StableQuality}`;
+          if (glyphQualEl) glyphQualEl.textContent = QUALITY_DESCRIPTIONS[p1StableQuality] || '';
+        } else {
+          if (glyphTextEl) glyphTextEl.textContent = '— —';
+          if (glyphQualEl) glyphQualEl.textContent = '';
+        }
+      }
+
+      if (playMode === 'duo') {
+        document.getElementById('p2-hud-chord').textContent = p2ChordLabelText;
+        document.getElementById('p2-chord-label').textContent = p2ChordLabelText;
+        document.getElementById('p2-hud-bar').style.width = p2Hands.length > 0 ? '100%' : '0%';
+        document.getElementById('p2-hud-fingers').textContent = `Root: ${p2StableRoot || '—'} | Quality: ${p2StableQuality}`;
+      }
+
+      // Confidence bars (100% if hand exists, 0% otherwise)
+      document.getElementById('p1-hud-bar').style.width = p1Hands.length > 0 ? '100%' : '0%';
+      document.getElementById('p1-hud-fingers').textContent = `Root: ${p1StableRoot || '—'} | Quality: ${p1StableQuality}`;
+
+      // Scoreboard text update
+      if (playMode === 'duo') {
+        document.getElementById('scoreboard').textContent = `🎵 Session  P1: ${p1ChordsCount} chords  P2: ${p2ChordsCount} chords  Together: ${togetherHarmoniesCount} harmonies`;
+      } else {
+        document.getElementById('scoreboard').textContent = `🎵 Session  Chords Triggered: ${p1ChordsCount}`;
+      }
+
+      // Harmony Label text update
+      const harmEl = document.getElementById('harmony-label');
+      if (playMode === 'duo' && currentHarmony) {
+        harmEl.textContent = currentHarmony;
+        harmEl.classList.add('active');
+      } else {
+        harmEl.classList.remove('active');
+      }
+
+      // Update Player 1 card highlights
+      document.querySelectorAll('#p1-left-panel .gesture-card').forEach(card => {
+        if (card.dataset.note === p1StableRoot) card.classList.add('active');
+        else card.classList.remove('active');
+      });
+      document.querySelectorAll('#p1-right-panel .orbital-node').forEach(node => {
+        if (node.dataset.quality === p1StableQuality) node.classList.add('active');
+        else node.classList.remove('active');
+      });
+
+      // Update Player 2 card highlights (duo mode only)
+      if (playMode === 'duo') {
+        document.querySelectorAll('#p2-left-panel .gesture-card').forEach(card => {
+          if (card.dataset.note === p2StableRoot) card.classList.add('active');
+          else card.classList.remove('active');
+        });
+        document.querySelectorAll('#p2-right-panel .orbital-node').forEach(node => {
+          if (node.dataset.quality === p2StableQuality) node.classList.add('active');
+          else node.classList.remove('active');
+        });
+      }
+
+      // ---- CANVAS RENDERINGS ----
+      if (playMode === 'duo') {
+        // 1. Divider Line
+        ctx.save();
+        ctx.setLineDash([10, 8]);
+        ctx.lineWidth = 1.5;
+        if (currentHarmony) {
+          ctx.shadowBlur = 20;
+          ctx.shadowColor = '#ffffff';
+          ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+        } else {
+          ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        }
+        ctx.beginPath();
+        ctx.moveTo(canvas.width / 2, 0);
+        ctx.lineTo(canvas.width / 2, canvas.height);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 2. skeletons (different colors)
+      // Render unified 2D Canvas visuals (beams, active effects, mist)
+      VFXShaderSystem.render(ctx);
+
+      for (let i = 0; i < p1Hands.length; i++) drawSkeleton(p1Hands[i], '#00ff88');
+      if (playMode === 'duo') {
+        for (let i = 0; i < p2Hands.length; i++) drawSkeleton(p2Hands[i], '#ff6ec7');
+      }
+
+      // 3. FPS
+      drawFPS();
+    }
+
+    // ===================================================================
+    // 9. EVENT BINDINGS
+    // ===================================================================
+    function bindSoundControls() {
+      // Player Setting Tabs
+      document.getElementById('sc-tab-p1')?.addEventListener('click', () => {
+        currentTabPlayer = 1;
+        updateSoundControlsUI();
+      });
+      document.getElementById('sc-tab-p2')?.addEventListener('click', () => {
+        currentTabPlayer = 2;
+        updateSoundControlsUI();
+      });
+
+      // Timbre
+      document.querySelectorAll('.sc-timbre-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          setTimbre(currentTabPlayer, btn.dataset.timbre);
+          updateSoundControlsUI();
+        });
+      });
+
+      // Autoplay selector
+      document.querySelectorAll('.sc-autoplay-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const dsp = currentTabPlayer === 1 ? p1Dsp : p2Dsp;
+          dsp.autoplayLevel = +btn.dataset.level;
+          silenceAll();
+          if (dsp.autoplayLevel > 0 && Tone.Transport.state !== 'started') {
+            Tone.Transport.start();
+          }
+          updateSoundControlsUI();
+        });
+      });
+
+      // Orbital node click selection (manual quality fallback)
+      document.querySelectorAll('.orbital-node').forEach(node => {
+        node.addEventListener('click', () => {
+          const q = node.dataset.quality;
+          if (q) {
+            p1StableQuality = q;
+            p1LastRawQuality = q;
+            p1QualitySince = performance.now();
+          }
+        });
+      });
+
+      // Filters
+      const hp = document.getElementById('hp-filter');
+      hp?.addEventListener('input', () => {
+        const dsp = currentTabPlayer === 1 ? p1Dsp : p2Dsp;
+        dsp.hpFreq = +hp.value;
+        const targetFilter = currentTabPlayer === 1 ? p1HpFilter : p2HpFilter;
+        if (targetFilter) targetFilter.frequency.rampTo(dsp.hpFreq, 0.1);
+        document.getElementById('hp-val').textContent = dsp.hpFreq < 1000 ? dsp.hpFreq + 'Hz' : (dsp.hpFreq/1000).toFixed(1) + 'k';
+      });
+
+      const lp = document.getElementById('lp-filter');
+      lp?.addEventListener('input', () => {
+        const dsp = currentTabPlayer === 1 ? p1Dsp : p2Dsp;
+        dsp.lpFreq = +lp.value;
+        const targetFilter = currentTabPlayer === 1 ? p1LpFilter : p2LpFilter;
+        if (targetFilter) targetFilter.frequency.rampTo(dsp.lpFreq, 0.1);
+        document.getElementById('lp-val').textContent = dsp.lpFreq >= 10000 ? (dsp.lpFreq/1000).toFixed(1)+'k' : (dsp.lpFreq/1000).toFixed(2)+'k';
+      });
+
+      // Sliders
+      const volSlider = document.getElementById('volume-slider');
+      volSlider?.addEventListener('input', () => {
+        const dsp = currentTabPlayer === 1 ? p1Dsp : p2Dsp;
+        const v = +volSlider.value;
+        dsp.volume = v === 0 ? -Infinity : -60 + v * 0.6;
+        const targetVol = currentTabPlayer === 1 ? p1VolumeNode : p2VolumeNode;
+        if (targetVol) targetVol.volume.rampTo(dsp.volume, 0.1);
+      });
+
+      const dyn = document.getElementById('dynamics-slider');
+      dyn?.addEventListener('input', () => {
+        const dsp = currentTabPlayer === 1 ? p1Dsp : p2Dsp;
+        dsp.velocity = +dyn.value / 100;
+      });
+
+      const rev = document.getElementById('reverb-slider');
+      rev?.addEventListener('input', () => {
+        reverbWet = +rev.value / 100;
+        if (reverb) reverb.wet.rampTo(reverbWet, 0.1);
+      });
+
+      // ADSR
+      const adsrInputs = { a: 'adsr-a', d: 'adsr-d', s: 'adsr-s', r: 'adsr-r' };
+      Object.entries(adsrInputs).forEach(([key, id]) => {
+        const el = document.getElementById(id);
+        el?.addEventListener('input', () => {
+          const dsp = currentTabPlayer === 1 ? p1Dsp : p2Dsp;
+          const v = +el.value;
+          if (key === 'a') { dsp.attack = v / 1000; document.getElementById('a-val').textContent = dsp.attack.toFixed(2) + 's'; }
+          if (key === 'd') { dsp.decay  = v / 1000; document.getElementById('d-val').textContent = dsp.decay.toFixed(2) + 's'; }
+          if (key === 's') { dsp.sustain = v / 100;  document.getElementById('s-val').textContent = v + '%'; }
+          if (key === 'r') { dsp.release = v / 1000; document.getElementById('r-val').textContent = dsp.release.toFixed(2) + 's'; }
+          
+          updatePlayerEnvelope(currentTabPlayer);
+          drawADSR();
+        });
+      });
+
+      // Collapse Sound Controls
+      document.getElementById('sc-toggle-btn')?.addEventListener('click', () => {
+        document.getElementById('sc-body')?.classList.toggle('collapsed');
+      });
+
+      adsrCanvas = document.getElementById('adsr-canvas');
+      if (adsrCanvas) adsrCtx = adsrCanvas.getContext('2d');
+      updateSoundControlsUI();
+    }
+
+    function drawADSR() {
+      if (!adsrCtx) return;
+      const dsp = currentTabPlayer === 1 ? p1Dsp : p2Dsp;
+      const c = adsrCanvas, g = adsrCtx;
+      const w = c.width, h = c.height;
+      g.clearRect(0, 0, w, h);
+
+      const pad = 8;
+      const plotW = w - pad * 2, plotH = h - pad * 2;
+      const totalTime = dsp.attack + dsp.decay + 0.3 + dsp.release;
+      const px = t => pad + (t / totalTime) * plotW;
+      const py = v => pad + (1 - v) * plotH;
+
+      g.strokeStyle = 'rgba(255,255,255,0.25)';
+      g.lineWidth = 1.5;
+      g.beginPath();
+      g.moveTo(px(0), py(0));
+      g.lineTo(px(dsp.attack), py(1));
+      g.lineTo(px(dsp.attack + dsp.decay), py(dsp.sustain));
+      g.lineTo(px(dsp.attack + dsp.decay + 0.3), py(dsp.sustain));
+      g.lineTo(px(totalTime), py(0));
+      g.stroke();
+
+      g.fillStyle = 'rgba(180,160,220,0.08)';
+      g.lineTo(px(totalTime), py(0));
+      g.lineTo(px(0), py(0));
+      g.closePath();
+      g.fill();
+
+      g.font = '9px Inter, sans-serif';
+      g.fillStyle = 'rgba(255,255,255,0.2)';
+      g.textAlign = 'center';
+      [
+        { t: dsp.attack / 2, label: 'A' },
+        { t: dsp.attack + dsp.decay / 2, label: 'D' },
+        { t: dsp.attack + dsp.decay + 0.15, label: 'S' },
+        { t: dsp.attack + dsp.decay + 0.3 + dsp.release / 2, label: 'R' }
+      ].forEach(l => g.fillText(l.label, px(l.t), h - 2));
+    }
+
+    // ===================================================================
+    // 10. SETUP & INITIALIZATION
+    // ===================================================================
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      if (typeof VFXShaderSystem !== 'undefined' && typeof VFXShaderSystem.init === 'function') {
+        VFXShaderSystem.init();
+      }
+      if (typeof ChordGlyphRenderer !== 'undefined' && typeof ChordGlyphRenderer.init === 'function') {
+        ChordGlyphRenderer.init();
+      }
+    }
+
+    let mpHandsInstance = null;
+
+    function startCamera() {
+      mpHandsInstance = new Hands({
+        locateFile: f => `./libs/hands/${f}`
+      });
+      mpHandsInstance.setOptions({
+        maxNumHands: 4,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.6
+      });
+      mpHandsInstance.onResults(onResults);
+
+      const cam = new Camera(videoEl, {
+        onFrame: async () => { await mpHandsInstance.send({ image: videoEl }); },
+        width: 1280, height: 720
+      });
+      cam.start();
+    }
+
+    (function init() {
+      resize();
+      window.addEventListener('resize', resize);
+      initAudio();
+      bindSoundControls();
+      VFXShaderSystem.init();
+      ChordGlyphRenderer.init();
+
+      // Mode Selector Button Handlers
+      const btnSingle = document.getElementById('btn-mode-single');
+      const btnDuo = document.getElementById('btn-mode-duo');
+      const tabP2 = document.getElementById('sc-tab-p2');
+
+      const btnSoloAccomp = document.getElementById('btn-mode-solo-accomp');
+
+      // Initialize body state as single player
+      document.body.classList.add('mode-single');
+
+      const switchMode = (mode) => {
+        // Deactivate solo_accomp if leaving it
+        if (playMode === 'solo_accomp' && mode !== 'solo_accomp') {
+          SoloAccompMode.deactivate();
+        }
+
+        playMode = mode;
+        silenceAll();
+
+        // Remove all mode classes
+        document.body.classList.remove('mode-single', 'mode-duo', 'mode-solo-accomp');
+
+        // Deactivate all mode buttons
+        btnSingle?.classList.remove('active');
+        btnDuo?.classList.remove('active');
+        btnSoloAccomp?.classList.remove('active');
+
+        if (mode === 'single') {
+          btnSingle?.classList.add('active');
+          document.body.classList.add('mode-single');
+          if (tabP2) tabP2.style.display = 'none';
+          currentTabPlayer = 1;
+          updateSoundControlsUI();
+          ChordGlyphRenderer.clear();
+        } else if (mode === 'duo') {
+          btnDuo?.classList.add('active');
+          document.body.classList.add('mode-duo');
+          if (tabP2) tabP2.style.display = 'block';
+          updateSoundControlsUI();
+          ChordGlyphRenderer.clear();
+        } else if (mode === 'solo_accomp') {
+          btnSoloAccomp?.classList.add('active');
+          document.body.classList.add('mode-solo-accomp');
+          if (tabP2) tabP2.style.display = 'none';
+          currentTabPlayer = 1;
+          ChordGlyphRenderer.clear();
+          SoloAccompMode.activate();
+        }
+      };
+
+      btnSingle?.addEventListener('click', () => switchMode('single'));
+      btnDuo?.addEventListener('click', () => switchMode('duo'));
+      btnSoloAccomp?.addEventListener('click', () => switchMode('solo_accomp'));
+
+      // Show Tap to Begin immediately to prevent Web Audio / decoding deadlocks
+      const sub = document.querySelector('.overlay-subtitle');
+      if (sub) sub.textContent = 'Tap anywhere to begin';
+
+      // Load samples in the background
+      Tone.loaded().then(() => {
+        samplersLoaded = true;
+        console.log('[samples] All strings samplers fully loaded and ready');
+      }).catch(err => {
+        console.error('[samples] Failed to load samples:', err);
+        samplersLoaded = true; // Fallback
+      });
+
+      const overlay = document.getElementById('start-overlay');
+      const begin = async () => {
+        if (audioStarted) return;
+        audioStarted = true;
+        overlay.classList.add('hidden');
+
+        try {
+          await Tone.start();
+          Tone.Transport.start();
+        } catch (e) {
+          console.error('Tone start failed:', e);
+        }
+
+        try {
+          startCamera();
+        } catch (e) {
+          console.error('Camera launch failed:', e);
+        }
+      };
+
+      overlay.addEventListener('click', begin);
+      overlay.addEventListener('touchstart', begin, { passive: true });
+    })();
+  </script>
+</body>
+</html>

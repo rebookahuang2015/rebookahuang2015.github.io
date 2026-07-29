@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statistical Probability Cloud — Test Page</title>
+    <!-- Load p5.js stable CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.85);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+            line-height: 1.6;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.45);
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px dashed rgba(255,255,255,0.25);
+        }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <strong style="color: #ffb700; font-size: 15px;">STATISTICAL PROBABILITY CLOUD</strong><br/>
+        ------------------------------------------<br/>
+        • Move your cursor Left ➔ Right to control u_tension<br/>
+        • Press keys [0] to [9] to snap to tension targets<br/>
+        • Click and hold to trigger Max Entropy (Tension = 1.0)
+    </div>
+    
+    <script src="sketch_ProbabilityCloud.js"></script>
+</body>
+</html>
