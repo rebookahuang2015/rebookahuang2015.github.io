@@ -152,6 +152,61 @@
       margin-top: 2px;
     }
 
+    /* ---- Chord Toolbar (extras below orbital) ---- */
+    .chord-toolbar {
+      display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
+      margin-top: 8px; padding: 8px 10px;
+      background: rgba(14,14,22,0.5);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 14px;
+      max-width: 360px;
+    }
+    .chord-toolbar .toolbar-label {
+      width: 100%; text-align: center;
+      font-size: 8px; font-weight: 600; letter-spacing: 1.8px;
+      text-transform: uppercase; color: rgba(255,255,255,0.2);
+      margin-bottom: 2px;
+    }
+    .toolbar-chip {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 10px;
+      background: rgba(26,26,36,0.7);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      cursor: grab;
+      transition: all 0.25s cubic-bezier(.25,.46,.45,.94);
+      user-select: none;
+    }
+    .toolbar-chip:hover {
+      background: rgba(40,40,55,0.8);
+      border-color: rgba(255,255,255,0.12);
+      transform: translateY(-1px);
+    }
+    .toolbar-chip:active { cursor: grabbing; }
+    .toolbar-chip .chip-emoji { font-size: 14px; line-height: 1; }
+    .toolbar-chip .chip-label {
+      font-size: 10px; font-weight: 600;
+      color: rgba(255,255,255,0.5);
+    }
+    .toolbar-chip.dragging {
+      opacity: 0.4; transform: scale(0.92);
+    }
+
+    /* Drag-over state for orbital nodes */
+    .orbital-node.drag-over {
+      border-color: rgba(255,255,255,0.35) !important;
+      box-shadow: 0 0 20px rgba(255,255,255,0.15), inset 0 0 12px rgba(255,255,255,0.05) !important;
+      transform: translate(-50%,-50%) rotate(var(--angle)) translateY(calc(-1 * var(--radius))) rotate(calc(-1 * var(--angle))) scale(1.1);
+    }
+    /* Also allow orbital nodes to be draggable back to toolbar */
+    .orbital-node[draggable="true"] { cursor: grab; }
+    .orbital-node[draggable="true"]:active { cursor: grabbing; }
+    .chord-toolbar.drag-over {
+      border-color: rgba(255,255,255,0.18);
+      background: rgba(30,30,45,0.6);
+    }
+
     /* ---- HUD Panels ---- */
     .hud-panel {
       position: fixed; top: 70px; z-index: 10;
@@ -761,37 +816,36 @@
     <div class="panel-header">P1 Chord Type</div>
     <div class="orbital-container">
       <div class="orbital-center">pick</div>
-      <div class="orbital-node" data-quality="Maj7" style="--angle:270deg">
-        <span class="node-emoji">🌙</span>
-        <span class="node-label">Maj 7</span>
-      </div>
-      <div class="orbital-node" data-quality="Major" style="--angle:315deg">
+      <div class="orbital-node" data-quality="Major" draggable="true" style="--angle:270deg">
         <span class="node-emoji">☀️</span>
         <span class="node-label">Major</span>
       </div>
-      <div class="orbital-node" data-quality="Dom7" style="--angle:0deg">
+      <div class="orbital-node" data-quality="Dom7" draggable="true" style="--angle:0deg">
         <span class="node-emoji">⚡</span>
         <span class="node-label">Dom 7</span>
       </div>
-      <div class="orbital-node" data-quality="Minor" style="--angle:45deg">
+      <div class="orbital-node" data-quality="Minor" draggable="true" style="--angle:90deg">
         <span class="node-emoji">🌧️</span>
         <span class="node-label">Minor</span>
       </div>
-      <div class="orbital-node" data-quality="Min7" style="--angle:90deg">
-        <span class="node-emoji">🌊</span>
-        <span class="node-label">Min 7</span>
-      </div>
-      <div class="orbital-node" data-quality="Dim" style="--angle:135deg">
+      <div class="orbital-node" data-quality="Dim" draggable="true" style="--angle:180deg">
         <span class="node-emoji">🕳️</span>
         <span class="node-label">Dim</span>
       </div>
-      <div class="orbital-node" data-quality="Sus4" style="--angle:180deg">
-        <span class="node-emoji">⏳</span>
-        <span class="node-label">Sus 4</span>
+    </div>
+    <div class="chord-toolbar" id="p1-chord-toolbar">
+      <div class="toolbar-label">Drag to swap</div>
+      <div class="toolbar-chip" draggable="true" data-quality="Maj7">
+        <span class="chip-emoji">🌙</span><span class="chip-label">Maj 7</span>
       </div>
-      <div class="orbital-node" data-quality="Sus2" style="--angle:225deg">
-        <span class="node-emoji">🫧</span>
-        <span class="node-label">Sus 2</span>
+      <div class="toolbar-chip" draggable="true" data-quality="Sus2">
+        <span class="chip-emoji">🫧</span><span class="chip-label">Sus 2</span>
+      </div>
+      <div class="toolbar-chip" draggable="true" data-quality="Sus4">
+        <span class="chip-emoji">⏳</span><span class="chip-label">Sus 4</span>
+      </div>
+      <div class="toolbar-chip" draggable="true" data-quality="Min7">
+        <span class="chip-emoji">🌊</span><span class="chip-label">Min 7</span>
       </div>
     </div>
   </div>
@@ -816,37 +870,36 @@
     <div class="panel-header">P2 Chord Type</div>
     <div class="orbital-container">
       <div class="orbital-center">pick</div>
-      <div class="orbital-node" data-quality="Maj7" style="--angle:270deg">
-        <span class="node-emoji">🌙</span>
-        <span class="node-label">Maj 7</span>
-      </div>
-      <div class="orbital-node" data-quality="Major" style="--angle:315deg">
+      <div class="orbital-node" data-quality="Major" draggable="true" style="--angle:270deg">
         <span class="node-emoji">☀️</span>
         <span class="node-label">Major</span>
       </div>
-      <div class="orbital-node" data-quality="Dom7" style="--angle:0deg">
+      <div class="orbital-node" data-quality="Dom7" draggable="true" style="--angle:0deg">
         <span class="node-emoji">⚡</span>
         <span class="node-label">Dom 7</span>
       </div>
-      <div class="orbital-node" data-quality="Minor" style="--angle:45deg">
+      <div class="orbital-node" data-quality="Minor" draggable="true" style="--angle:90deg">
         <span class="node-emoji">🌧️</span>
         <span class="node-label">Minor</span>
       </div>
-      <div class="orbital-node" data-quality="Min7" style="--angle:90deg">
-        <span class="node-emoji">🌊</span>
-        <span class="node-label">Min 7</span>
-      </div>
-      <div class="orbital-node" data-quality="Dim" style="--angle:135deg">
+      <div class="orbital-node" data-quality="Dim" draggable="true" style="--angle:180deg">
         <span class="node-emoji">🕳️</span>
         <span class="node-label">Dim</span>
       </div>
-      <div class="orbital-node" data-quality="Sus4" style="--angle:180deg">
-        <span class="node-emoji">⏳</span>
-        <span class="node-label">Sus 4</span>
+    </div>
+    <div class="chord-toolbar" id="p2-chord-toolbar">
+      <div class="toolbar-label">Drag to swap</div>
+      <div class="toolbar-chip" draggable="true" data-quality="Maj7">
+        <span class="chip-emoji">🌙</span><span class="chip-label">Maj 7</span>
       </div>
-      <div class="orbital-node" data-quality="Sus2" style="--angle:225deg">
-        <span class="node-emoji">🫧</span>
-        <span class="node-label">Sus 2</span>
+      <div class="toolbar-chip" draggable="true" data-quality="Sus2">
+        <span class="chip-emoji">🫧</span><span class="chip-label">Sus 2</span>
+      </div>
+      <div class="toolbar-chip" draggable="true" data-quality="Sus4">
+        <span class="chip-emoji">⏳</span><span class="chip-label">Sus 4</span>
+      </div>
+      <div class="toolbar-chip" draggable="true" data-quality="Min7">
+        <span class="chip-emoji">🌊</span><span class="chip-label">Min 7</span>
       </div>
     </div>
   </div>
@@ -3885,6 +3938,144 @@
           }
         });
       });
+
+      // ---- Chord Toolbar: Drag-and-Drop Swap ----
+      const QUALITY_META = {
+        'Major': { emoji: '☀️', label: 'Major' },
+        'Dom7':  { emoji: '⚡', label: 'Dom 7' },
+        'Minor': { emoji: '🌧️', label: 'Minor' },
+        'Dim':   { emoji: '🕳️', label: 'Dim' },
+        'Maj7':  { emoji: '🌙', label: 'Maj 7' },
+        'Min7':  { emoji: '🌊', label: 'Min 7' },
+        'Sus4':  { emoji: '⏳', label: 'Sus 4' },
+        'Sus2':  { emoji: '🫧', label: 'Sus 2' },
+      };
+
+      let dragSource = null;   // { element, type: 'chip'|'node', quality }
+
+      function initChordToolbarDnD(panelId, toolbarId) {
+        const panel = document.getElementById(panelId);
+        const toolbar = document.getElementById(toolbarId);
+        if (!panel || !toolbar) return;
+
+        const orbitalNodes = panel.querySelectorAll('.orbital-node');
+        const toolbarChips = toolbar.querySelectorAll('.toolbar-chip');
+
+        // --- Toolbar chip drag start ---
+        toolbarChips.forEach(chip => {
+          chip.addEventListener('dragstart', (e) => {
+            dragSource = { element: chip, type: 'chip', quality: chip.dataset.quality };
+            chip.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', chip.dataset.quality);
+          });
+          chip.addEventListener('dragend', () => {
+            chip.classList.remove('dragging');
+            clearAllDragOver(panel, toolbar);
+            dragSource = null;
+          });
+        });
+
+        // --- Orbital node drag start (drag node back to toolbar) ---
+        orbitalNodes.forEach(node => {
+          node.addEventListener('dragstart', (e) => {
+            dragSource = { element: node, type: 'node', quality: node.dataset.quality };
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', node.dataset.quality);
+          });
+          node.addEventListener('dragend', () => {
+            clearAllDragOver(panel, toolbar);
+            dragSource = null;
+          });
+        });
+
+        // --- Orbital nodes as drop targets (for toolbar chips) ---
+        orbitalNodes.forEach(node => {
+          node.addEventListener('dragover', (e) => {
+            if (!dragSource || dragSource.type !== 'chip') return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            node.classList.add('drag-over');
+          });
+          node.addEventListener('dragleave', () => {
+            node.classList.remove('drag-over');
+          });
+          node.addEventListener('drop', (e) => {
+            e.preventDefault();
+            node.classList.remove('drag-over');
+            if (!dragSource || dragSource.type !== 'chip') return;
+
+            const incomingQuality = dragSource.quality;
+            const outgoingQuality = node.dataset.quality;
+            if (incomingQuality === outgoingQuality) return;
+
+            // Swap: orbital node gets the incoming quality
+            const inMeta = QUALITY_META[incomingQuality];
+            node.dataset.quality = incomingQuality;
+            node.querySelector('.node-emoji').textContent = inMeta.emoji;
+            node.querySelector('.node-label').textContent = inMeta.label;
+
+            // Toolbar chip gets the outgoing quality
+            const outMeta = QUALITY_META[outgoingQuality];
+            dragSource.element.dataset.quality = outgoingQuality;
+            dragSource.element.querySelector('.chip-emoji').textContent = outMeta.emoji;
+            dragSource.element.querySelector('.chip-label').textContent = outMeta.label;
+
+            // Animate the swapped node briefly
+            node.style.transition = 'transform 0.3s cubic-bezier(.25,.46,.45,.94), box-shadow 0.3s ease';
+            node.classList.add('drag-over');
+            setTimeout(() => node.classList.remove('drag-over'), 350);
+
+            dragSource = null;
+          });
+        });
+
+        // --- Toolbar as drop target (for orbital nodes dragged back) ---
+        toolbar.addEventListener('dragover', (e) => {
+          if (!dragSource || dragSource.type !== 'node') return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          toolbar.classList.add('drag-over');
+        });
+        toolbar.addEventListener('dragleave', () => {
+          toolbar.classList.remove('drag-over');
+        });
+        toolbar.addEventListener('drop', (e) => {
+          e.preventDefault();
+          toolbar.classList.remove('drag-over');
+          if (!dragSource || dragSource.type !== 'node') return;
+
+          // Find the first toolbar chip to swap with
+          const firstChip = toolbar.querySelector('.toolbar-chip');
+          if (!firstChip) return;
+
+          const nodeQuality = dragSource.quality;
+          const chipQuality = firstChip.dataset.quality;
+          if (nodeQuality === chipQuality) return;
+
+          // Swap: node gets chip quality, chip gets node quality
+          const chipMeta = QUALITY_META[chipQuality];
+          dragSource.element.dataset.quality = chipQuality;
+          dragSource.element.querySelector('.node-emoji').textContent = chipMeta.emoji;
+          dragSource.element.querySelector('.node-label').textContent = chipMeta.label;
+
+          const nodeMeta = QUALITY_META[nodeQuality];
+          firstChip.dataset.quality = nodeQuality;
+          firstChip.querySelector('.chip-emoji').textContent = nodeMeta.emoji;
+          firstChip.querySelector('.chip-label').textContent = nodeMeta.label;
+
+          dragSource = null;
+        });
+      }
+
+      function clearAllDragOver(panel, toolbar) {
+        panel.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        toolbar.classList.remove('drag-over');
+      }
+
+      // Initialize drag-and-drop for both player panels
+      initChordToolbarDnD('p1-right-panel', 'p1-chord-toolbar');
+      initChordToolbarDnD('p2-right-panel', 'p2-chord-toolbar');
 
       // Filters
       const hp = document.getElementById('hp-filter');
