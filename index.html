@@ -1929,23 +1929,38 @@
     }
 
     function drawSkeleton(lm, playerColor) {
+      const isP1 = playerColor === '#00ff88';
+      const glowColor = isP1 ? 'rgba(0,255,136,0.25)' : 'rgba(255,110,199,0.25)';
+      // Batch all bone lines in one path
       ctx.strokeStyle = playerColor;
       ctx.lineWidth = 2.5;
       ctx.lineCap = 'round';
+      ctx.beginPath();
       for (const [a, b] of BONES) {
-        ctx.beginPath();
         ctx.moveTo(scrX(lm[a].x), scrY(lm[a].y));
         ctx.lineTo(scrX(lm[b].x), scrY(lm[b].y));
-        ctx.stroke();
       }
+      ctx.stroke();
+      // Batch glow dots
+      ctx.fillStyle = glowColor;
+      ctx.beginPath();
       for (let i = 0; i < 21; i++) {
         const px = scrX(lm[i].x), py = scrY(lm[i].y);
-        const tip = (i===4||i===8||i===12||i===16||i===20);
-        ctx.fillStyle = playerColor === '#00ff88' ? 'rgba(0,255,136,0.25)' : 'rgba(255,110,199,0.25)';
-        ctx.beginPath(); ctx.arc(px, py, tip?14:9, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = playerColor;
-        ctx.beginPath(); ctx.arc(px, py, tip?6:4, 0, Math.PI*2); ctx.fill();
+        const r = (i===4||i===8||i===12||i===16||i===20) ? 12 : 7;
+        ctx.moveTo(px + r, py);
+        ctx.arc(px, py, r, 0, Math.PI*2);
       }
+      ctx.fill();
+      // Batch core dots
+      ctx.fillStyle = playerColor;
+      ctx.beginPath();
+      for (let i = 0; i < 21; i++) {
+        const px = scrX(lm[i].x), py = scrY(lm[i].y);
+        const r = (i===4||i===8||i===12||i===16||i===20) ? 5 : 3;
+        ctx.moveTo(px + r, py);
+        ctx.arc(px, py, r, 0, Math.PI*2);
+      }
+      ctx.fill();
     }
 
     function drawFPS() {
@@ -1987,7 +2002,7 @@
 
       init() {
         this.mists = [];
-        for (let i = 0; i < 16; i++) {
+        for (let i = 0; i < 8; i++) {
           this.mists.push({
             x: Math.random() * canvas.width,
             y: canvas.height - 30 - Math.random() * 90,
@@ -3618,6 +3633,29 @@
     // ===================================================================
     // 8. MEDIAPIPE ONRESULTS MAIN LOOP
     // ===================================================================
+    // Cache DOM refs once (avoid per-frame getElementById/querySelectorAll)
+    const _dom = {
+      p1HudChord: document.getElementById('p1-hud-chord'),
+      p1ChordLabel: document.getElementById('p1-chord-label'),
+      p2HudChord: document.getElementById('p2-hud-chord'),
+      p2ChordLabel: document.getElementById('p2-chord-label'),
+      p2HudBar: document.getElementById('p2-hud-bar'),
+      p2HudFingers: document.getElementById('p2-hud-fingers'),
+      p1HudBar: document.getElementById('p1-hud-bar'),
+      p1HudFingers: document.getElementById('p1-hud-fingers'),
+      scoreboard: document.getElementById('scoreboard'),
+      harmonyLabel: document.getElementById('harmony-label'),
+      glyphChordText: document.getElementById('glyph-chord-text'),
+      glyphChordQuality: document.getElementById('glyph-chord-quality'),
+      p1Cards: document.querySelectorAll('#p1-left-panel .gesture-card'),
+      p1Segments: null, // rebuilt dynamically
+      p2Cards: document.querySelectorAll('#p2-left-panel .gesture-card'),
+      p2Segments: null, // rebuilt dynamically
+    };
+    // Track previous values to skip redundant DOM writes
+    let _prevP1Chord = '', _prevP2Chord = '', _prevP1Root = '', _prevP1Qual = '';
+    let _prevP2Root = '', _prevP2Qual = '', _prevScore = '';
+
     function onResults(results) {
       // Dismiss loading screen on first frame
       if (!window._firstFrameReceived) {
@@ -3894,71 +3932,77 @@
         }
       }
 
-      // ---- UPDATE DOM HUD ELEMENTS ----
+      // ---- UPDATE DOM HUD ELEMENTS (cached refs, dirty-checked) ----
       const p1ChordLabelText = p1ChordName || '—';
       const p2ChordLabelText = p2ChordName || '—';
-      
-      document.getElementById('p1-hud-chord').textContent = p1ChordLabelText;
-      document.getElementById('p1-chord-label').textContent = p1ChordLabelText;
 
-      // Update center glyph chord text every frame (single-player mode)
+      if (p1ChordLabelText !== _prevP1Chord) {
+        _prevP1Chord = p1ChordLabelText;
+        if (_dom.p1HudChord) _dom.p1HudChord.textContent = p1ChordLabelText;
+        if (_dom.p1ChordLabel) _dom.p1ChordLabel.textContent = p1ChordLabelText;
+      }
+
+      // Update center glyph chord text (single-player mode)
       if (playMode === 'single') {
-        const glyphTextEl = document.getElementById('glyph-chord-text');
-        const glyphQualEl = document.getElementById('glyph-chord-quality');
-        if (p1StableRoot && p1StableRoot !== 'Stop') {
-          const displayRoot = p1StableRoot === 'C5' ? 'C' : p1StableRoot;
-          if (glyphTextEl) glyphTextEl.textContent = `${displayRoot} ${p1StableQuality}`;
-          if (glyphQualEl) glyphQualEl.textContent = QUALITY_DESCRIPTIONS[p1StableQuality] || '';
-        } else {
-          if (glyphTextEl) glyphTextEl.textContent = '— —';
-          if (glyphQualEl) glyphQualEl.textContent = '';
+        const newRoot = (p1StableRoot && p1StableRoot !== 'Stop') ? (p1StableRoot === 'C5' ? 'C' : p1StableRoot) : null;
+        const newQual = newRoot ? p1StableQuality : null;
+        if (newRoot !== _prevP1Root || newQual !== _prevP1Qual) {
+          _prevP1Root = newRoot; _prevP1Qual = newQual;
+          if (_dom.glyphChordText) _dom.glyphChordText.textContent = newRoot ? `${newRoot} ${newQual}` : '— —';
+          if (_dom.glyphChordQuality) _dom.glyphChordQuality.textContent = newRoot ? (QUALITY_DESCRIPTIONS[newQual] || '') : '';
         }
       }
 
       if (playMode === 'duo') {
-        document.getElementById('p2-hud-chord').textContent = p2ChordLabelText;
-        document.getElementById('p2-chord-label').textContent = p2ChordLabelText;
-        document.getElementById('p2-hud-bar').style.width = p2Hands.length > 0 ? '100%' : '0%';
-        document.getElementById('p2-hud-fingers').textContent = `Root: ${p2StableRoot || '—'} | Quality: ${p2StableQuality}`;
+        if (p2ChordLabelText !== _prevP2Chord) {
+          _prevP2Chord = p2ChordLabelText;
+          if (_dom.p2HudChord) _dom.p2HudChord.textContent = p2ChordLabelText;
+          if (_dom.p2ChordLabel) _dom.p2ChordLabel.textContent = p2ChordLabelText;
+        }
+        if (_dom.p2HudBar) _dom.p2HudBar.style.width = p2Hands.length > 0 ? '100%' : '0%';
+        if (_dom.p2HudFingers) _dom.p2HudFingers.textContent = `Root: ${p2StableRoot || '—'} | Quality: ${p2StableQuality}`;
       }
 
-      // Confidence bars (100% if hand exists, 0% otherwise)
-      document.getElementById('p1-hud-bar').style.width = p1Hands.length > 0 ? '100%' : '0%';
-      document.getElementById('p1-hud-fingers').textContent = `Root: ${p1StableRoot || '—'} | Quality: ${p1StableQuality}`;
+      if (_dom.p1HudBar) _dom.p1HudBar.style.width = p1Hands.length > 0 ? '100%' : '0%';
+      if (_dom.p1HudFingers) _dom.p1HudFingers.textContent = `Root: ${p1StableRoot || '—'} | Quality: ${p1StableQuality}`;
 
-      // Scoreboard text update
-      if (playMode === 'duo') {
-        document.getElementById('scoreboard').textContent = `🎵 Session  P1: ${p1ChordsCount} chords  P2: ${p2ChordsCount} chords  Together: ${togetherHarmoniesCount} harmonies`;
-      } else {
-        document.getElementById('scoreboard').textContent = `🎵 Session  Chords Triggered: ${p1ChordsCount}`;
+      // Scoreboard (only update when changed)
+      const scoreText = playMode === 'duo'
+        ? `🎵 Session  P1: ${p1ChordsCount} chords  P2: ${p2ChordsCount} chords  Together: ${togetherHarmoniesCount} harmonies`
+        : `🎵 Session  Chords Triggered: ${p1ChordsCount}`;
+      if (scoreText !== _prevScore) {
+        _prevScore = scoreText;
+        if (_dom.scoreboard) _dom.scoreboard.textContent = scoreText;
       }
 
       // Harmony Label text update
-      const harmEl = document.getElementById('harmony-label');
       if (playMode === 'duo' && currentHarmony) {
-        harmEl.textContent = currentHarmony;
-        harmEl.classList.add('active');
+        _dom.harmonyLabel.textContent = currentHarmony;
+        _dom.harmonyLabel.classList.add('active');
       } else {
-        harmEl.classList.remove('active');
+        _dom.harmonyLabel.classList.remove('active');
       }
 
-      // Update Player 1 card highlights
-      document.querySelectorAll('#p1-left-panel .gesture-card').forEach(card => {
+      // Update Player 1 card highlights (cached NodeLists)
+      _dom.p1Cards.forEach(card => {
         if (card.dataset.note === p1StableRoot) card.classList.add('active');
         else card.classList.remove('active');
       });
-      document.querySelectorAll('#p1-pie-wheel .pie-segment-group').forEach(seg => {
+      // Pie segments may have been rebuilt; re-query only if null or stale
+      const p1Segs = document.getElementById('p1-pie-wheel')?.querySelectorAll('.pie-segment-group');
+      if (p1Segs) p1Segs.forEach(seg => {
         if (seg.dataset.quality === p1StableQuality) seg.classList.add('active');
         else seg.classList.remove('active');
       });
 
       // Update Player 2 card highlights (duo mode only)
       if (playMode === 'duo') {
-        document.querySelectorAll('#p2-left-panel .gesture-card').forEach(card => {
+        _dom.p2Cards.forEach(card => {
           if (card.dataset.note === p2StableRoot) card.classList.add('active');
           else card.classList.remove('active');
         });
-        document.querySelectorAll('#p2-pie-wheel .pie-segment-group').forEach(seg => {
+        const p2Segs = document.getElementById('p2-pie-wheel')?.querySelectorAll('.pie-segment-group');
+        if (p2Segs) p2Segs.forEach(seg => {
           if (seg.dataset.quality === p2StableQuality) seg.classList.add('active');
           else seg.classList.remove('active');
         });
@@ -4354,7 +4398,7 @@
 
       const cam = new Camera(videoEl, {
         onFrame: async () => { await mpHandsInstance.send({ image: videoEl }); },
-        width: 960, height: 540
+        width: 640, height: 480
       });
       cam.start();
     }
