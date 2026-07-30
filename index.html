@@ -4167,6 +4167,7 @@
 
       // Attach click handlers for pie segments (click to select quality)
       // Use event delegation — listeners set ONCE on SVG, work across rebuilds
+      // Attach interaction handlers for pie segments & toolbar
       function setupPieSystem(wheelId, toolbarId, pieQualities, playerNum) {
         const svgEl = document.getElementById(wheelId);
         const toolbarEl = document.getElementById(toolbarId);
@@ -4178,17 +4179,114 @@
           rebuildToolbar(toolbarEl, pieQualities);
         }
 
-        // --- SVG: click to select quality (delegated) ---
-        svgEl.addEventListener('click', (e) => {
+        // --- Pointer Drag from Pie Segment -> Toolbar (or off pie wheel) ---
+        let activePointerDrag = null;
+
+        svgEl.addEventListener('pointerdown', (e) => {
+          if (e.button !== 0) return; // Left click / touch only
           const seg = e.target.closest('.pie-segment-group');
           if (!seg) return;
           const q = seg.dataset.quality;
           if (!q) return;
-          if (playerNum === 1) {
-            p1StableQuality = q; p1LastRawQuality = q; p1QualitySince = performance.now();
-          } else {
-            p2StableQuality = q; p2LastRawQuality = q; p2QualitySince = performance.now();
-          }
+
+          activePointerDrag = {
+            quality: q,
+            startX: e.clientX,
+            startY: e.clientY,
+            isDragging: false,
+            ghost: null
+          };
+
+          const onPointerMove = (moveEv) => {
+            if (!activePointerDrag) return;
+            const dx = moveEv.clientX - activePointerDrag.startX;
+            const dy = moveEv.clientY - activePointerDrag.startY;
+
+            // Start dragging if moved > 8px
+            if (!activePointerDrag.isDragging && (dx * dx + dy * dy > 64)) {
+              activePointerDrag.isDragging = true;
+              const meta = QUALITY_META[activePointerDrag.quality] || { emoji: '🎵', label: activePointerDrag.quality };
+              const ghost = document.createElement('div');
+              ghost.className = 'drag-ghost-chip';
+              ghost.innerHTML = `<span class="chip-emoji">${meta.emoji}</span><span class="chip-label">${meta.label}</span>`;
+              ghost.style.cssText = `
+                position: fixed; z-index: 10000; pointer-events: none;
+                transform: translate(-50%, -50%);
+                padding: 6px 14px; background: rgba(22,22,34,0.92);
+                border: 1px solid rgba(255,255,255,0.3); border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.6); font-size: 13px; color: #fff;
+                display: flex; align-items: center; gap: 6px; font-family: sans-serif;
+                backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+              `;
+              document.body.appendChild(ghost);
+              activePointerDrag.ghost = ghost;
+            }
+
+            if (activePointerDrag.isDragging && activePointerDrag.ghost) {
+              activePointerDrag.ghost.style.left = moveEv.clientX + 'px';
+              activePointerDrag.ghost.style.top = moveEv.clientY + 'px';
+
+              // Highlight toolbar if dragged towards it or outside pie wrapper
+              const tbRect = toolbarEl.getBoundingClientRect();
+              const wrRect = wrapper.getBoundingClientRect();
+              const isOverTb = (moveEv.clientX >= tbRect.left && moveEv.clientX <= tbRect.right &&
+                                moveEv.clientY >= tbRect.top && moveEv.clientY <= tbRect.bottom);
+              const isOutsideWr = (moveEv.clientX < wrRect.left || moveEv.clientX > wrRect.right ||
+                                   moveEv.clientY < wrRect.top || moveEv.clientY > wrRect.bottom);
+
+              if (isOverTb || isOutsideWr) {
+                toolbarEl.classList.add('drag-over');
+              } else {
+                toolbarEl.classList.remove('drag-over');
+              }
+            }
+          };
+
+          const onPointerUp = (upEv) => {
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onPointerUp);
+            window.removeEventListener('pointercancel', onPointerUp);
+
+            toolbarEl.classList.remove('drag-over');
+
+            if (!activePointerDrag) return;
+
+            if (activePointerDrag.ghost) {
+              activePointerDrag.ghost.remove();
+            }
+
+            if (activePointerDrag.isDragging) {
+              // Check if dropped over toolbar or outside pie wrapper
+              const tbRect = toolbarEl.getBoundingClientRect();
+              const wrRect = wrapper.getBoundingClientRect();
+              const isOverTb = (upEv.clientX >= tbRect.left && upEv.clientX <= tbRect.right &&
+                                upEv.clientY >= tbRect.top && upEv.clientY <= tbRect.bottom);
+              const isOutsideWr = (upEv.clientX < wrRect.left || upEv.clientX > wrRect.right ||
+                                   upEv.clientY < wrRect.top || upEv.clientY > wrRect.bottom);
+
+              if ((isOverTb || isOutsideWr) && pieQualities.length > 1) {
+                const idx = pieQualities.indexOf(activePointerDrag.quality);
+                if (idx >= 0) {
+                  pieQualities.splice(idx, 1);
+                  refresh();
+                }
+              }
+            } else {
+              // Tap / Click without dragging -> select chord quality
+              const q = activePointerDrag.quality;
+              if (playerNum === 1) {
+                p1StableQuality = q; p1LastRawQuality = q; p1QualitySince = performance.now();
+              } else {
+                p2StableQuality = q; p2LastRawQuality = q; p2QualitySince = performance.now();
+              }
+            }
+
+            activePointerDrag = null;
+          };
+
+          window.addEventListener('pointermove', onPointerMove);
+          window.addEventListener('pointerup', onPointerUp);
+          window.addEventListener('pointercancel', onPointerUp);
         });
 
         // --- SVG: right-click to remove from pie (delegated) ---
