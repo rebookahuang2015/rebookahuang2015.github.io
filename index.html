@@ -1598,76 +1598,84 @@
       // ── Player 1 Instrument Bank ──
       p1Instruments.strings.chord = new Tone.Sampler({
         urls: CELLO_URLS, baseUrl: SAMPLE_BASE + 'cello/',
-        attack: 0.25, release: 1.2, volume: 0,
+        attack: 0.25, release: 1.5, volume: 0,
         onload: () => onSamplerLoaded('cello-p1')
       }).connect(p1Panner);
       p1Instruments.strings.arp = new Tone.Sampler({
         urls: VIOLIN_URLS, baseUrl: SAMPLE_BASE + 'violin/',
-        attack: 0.03, release: 0.6, volume: -2,
+        attack: 0.03, release: 0.8, volume: -2,
         onload: () => onSamplerLoaded('violin-p1')
       }).connect(p1Panner);
 
       p1Instruments.synth.chord = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 3.01, modulationIndex: 1.5,
-        oscillator: { type: 'sine' }, modulation: { type: 'triangle' },
-        envelope: { attack: 0.06, decay: 0.8, sustain: 0.4, release: 1.5 },
+        maxPolyphony: 8, harmonicity: 3.01, modulationIndex: 2.2,
+        oscillator: { type: 'triangle' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.06, decay: 0.8, sustain: 0.5, release: 1.5 },
+        modulationEnvelope: { attack: 0.08, decay: 0.7, sustain: 0.6, release: 2.0 },
         volume: -6
       }).connect(p1Panner);
       p1Instruments.synth.arp = new Tone.PolySynth(Tone.FMSynth, {
         maxPolyphony: 8, harmonicity: 2.0, modulationIndex: 2.5,
-        oscillator: { type: 'sine' }, modulation: { type: 'sine' },
-        envelope: { attack: 0.01, decay: 0.35, sustain: 0.15, release: 0.5 },
+        oscillator: { type: 'triangle' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.01, decay: 0.35, sustain: 0.25, release: 0.8 },
+        modulationEnvelope: { attack: 0.02, decay: 0.3, sustain: 0.4, release: 1.2 },
         volume: -8
       }).connect(p1Panner);
 
       p1Instruments.woodwind.chord = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 1.0, modulationIndex: 4.0,
-        oscillator: { type: 'sine' }, modulation: { type: 'square' },
-        envelope: { attack: 0.12, decay: 0.6, sustain: 0.5, release: 1.0 },
+        maxPolyphony: 8, harmonicity: 1.0, modulationIndex: 3.5,
+        oscillator: { type: 'triangle' }, modulation: { type: 'square' },
+        envelope: { attack: 0.12, decay: 0.6, sustain: 0.5, release: 1.2 },
+        modulationEnvelope: { attack: 0.14, decay: 0.5, sustain: 0.6, release: 1.8 },
         volume: -5
       }).connect(p1Panner);
       p1Instruments.woodwind.arp = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 1.5, modulationIndex: 5.0,
-        oscillator: { type: 'sine' }, modulation: { type: 'square' },
-        envelope: { attack: 0.02, decay: 0.25, sustain: 0.2, release: 0.4 },
+        maxPolyphony: 8, harmonicity: 1.5, modulationIndex: 4.5,
+        oscillator: { type: 'triangle' }, modulation: { type: 'square' },
+        envelope: { attack: 0.02, decay: 0.25, sustain: 0.3, release: 0.6 },
+        modulationEnvelope: { attack: 0.03, decay: 0.2, sustain: 0.4, release: 1.0 },
         volume: -7
       }).connect(p1Panner);
 
       // ── Player 2 Instrument Bank ──
       p2Instruments.strings.chord = new Tone.Sampler({
         urls: CELLO_URLS, baseUrl: SAMPLE_BASE + 'cello/',
-        attack: 0.25, release: 1.2, volume: 0,
+        attack: 0.25, release: 1.5, volume: 0,
         onload: () => onSamplerLoaded('cello-p2')
       }).connect(p2Panner);
       p2Instruments.strings.arp = new Tone.Sampler({
         urls: VIOLIN_URLS, baseUrl: SAMPLE_BASE + 'violin/',
-        attack: 0.03, release: 0.6, volume: -2,
+        attack: 0.03, release: 0.8, volume: -2,
         onload: () => onSamplerLoaded('violin-p2')
       }).connect(p2Panner);
 
       p2Instruments.synth.chord = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 3.01, modulationIndex: 1.5,
-        oscillator: { type: 'sine' }, modulation: { type: 'triangle' },
-        envelope: { attack: 0.06, decay: 0.8, sustain: 0.4, release: 1.5 },
+        maxPolyphony: 8, harmonicity: 3.01, modulationIndex: 2.2,
+        oscillator: { type: 'triangle' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.06, decay: 0.8, sustain: 0.5, release: 1.5 },
+        modulationEnvelope: { attack: 0.08, decay: 0.7, sustain: 0.6, release: 2.0 },
         volume: -6
       }).connect(p2Panner);
       p2Instruments.synth.arp = new Tone.PolySynth(Tone.FMSynth, {
         maxPolyphony: 8, harmonicity: 2.0, modulationIndex: 2.5,
-        oscillator: { type: 'sine' }, modulation: { type: 'sine' },
-        envelope: { attack: 0.01, decay: 0.35, sustain: 0.15, release: 0.5 },
+        oscillator: { type: 'triangle' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.01, decay: 0.35, sustain: 0.25, release: 0.8 },
+        modulationEnvelope: { attack: 0.02, decay: 0.3, sustain: 0.4, release: 1.2 },
         volume: -8
       }).connect(p2Panner);
 
       p2Instruments.woodwind.chord = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 1.0, modulationIndex: 4.0,
-        oscillator: { type: 'sine' }, modulation: { type: 'square' },
-        envelope: { attack: 0.12, decay: 0.6, sustain: 0.5, release: 1.0 },
+        maxPolyphony: 8, harmonicity: 1.0, modulationIndex: 3.5,
+        oscillator: { type: 'triangle' }, modulation: { type: 'square' },
+        envelope: { attack: 0.12, decay: 0.6, sustain: 0.5, release: 1.2 },
+        modulationEnvelope: { attack: 0.14, decay: 0.5, sustain: 0.6, release: 1.8 },
         volume: -5
       }).connect(p2Panner);
       p2Instruments.woodwind.arp = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 1.5, modulationIndex: 5.0,
-        oscillator: { type: 'sine' }, modulation: { type: 'square' },
-        envelope: { attack: 0.02, decay: 0.25, sustain: 0.2, release: 0.4 },
+        maxPolyphony: 8, harmonicity: 1.5, modulationIndex: 4.5,
+        oscillator: { type: 'triangle' }, modulation: { type: 'square' },
+        envelope: { attack: 0.02, decay: 0.25, sustain: 0.3, release: 0.6 },
+        modulationEnvelope: { attack: 0.03, decay: 0.2, sustain: 0.4, release: 1.0 },
         volume: -7
       }).connect(p2Panner);
 
@@ -3159,30 +3167,27 @@
         this.soloReverbNode.chain(this.soloMasterVol, Tone.Destination);
 
         // Per-hand warm string FMSynth
-        // Sine carrier + triangle modulator at low harmonicity = bowed-string character
+        // Triangle carrier + triangle modulator at rich harmonicity = lush bowed-string character
         const synthConfigs = [
-          { harm: 1.5, modIdx: 1.2, lpFreq: 2000 },   // Hand 1
-          { harm: 1.8, modIdx: 1.0, lpFreq: 1800 }    // Hand 2: slightly different color
+          { harm: 1.5, modIdx: 2.2, lpFreq: 4500 },   // Hand 1: warm rich harmonics
+          { harm: 1.8, modIdx: 2.0, lpFreq: 4000 }    // Hand 2: warm rich harmonics
         ];
 
         for (let h = 0; h < 2; h++) {
           const cfg = synthConfigs[h];
           this.hGain[h] = new Tone.Gain(0.5).connect(this.soloReverbNode);
 
-          // FMSynth for the warm, classy string tone
+          // FMSynth with extended modulation envelope release so overtones ring out all the way to silence
           this.hSynth[h] = new Tone.FMSynth({
             harmonicity: cfg.harm,
             modulationIndex: cfg.modIdx,
-            oscillator: { type: 'sine' },
+            oscillator: { type: 'triangle' },
             modulation: { type: 'triangle' },
-            envelope: { attack: 0.2, decay: 0.6, sustain: 0.8, release: 1.2 },
-            modulationEnvelope: { attack: 0.3, decay: 0.4, sustain: 0.6, release: 0.8 },
+            envelope: { attack: 0.18, decay: 0.6, sustain: 0.8, release: 1.5 },
+            modulationEnvelope: { attack: 0.2, decay: 0.5, sustain: 0.85, release: 2.2 },
             volume: -4
           }).connect(this.hGain[h]);
 
-          // Add a gentle lowpass to tame any brightness
-          // Note: FMSynth doesn't have a built-in filter, so we insert one in the chain
-          // Actually, let's reconnect through a filter
           this.hSynth[h].disconnect();
           const lpf = new Tone.Filter({ frequency: cfg.lpFreq, type: 'lowpass', rolloff: -12 });
           this.hSynth[h].connect(lpf);
@@ -3301,6 +3306,14 @@
         synth.envelope.decay = env.decay;
         synth.envelope.sustain = env.sustain;
         synth.envelope.release = env.release;
+
+        // Keep modulation envelope release longer than amplitude release so harmonics persist through release tail
+        if (synth.modulationEnvelope) {
+          synth.modulationEnvelope.attack = env.attack * 1.1;
+          synth.modulationEnvelope.decay = env.decay * 1.2;
+          synth.modulationEnvelope.sustain = env.sustain * 0.9;
+          synth.modulationEnvelope.release = env.release * 1.5;
+        }
 
         // HUD shows hand 1 articulation
         if (handIdx === 0) {
