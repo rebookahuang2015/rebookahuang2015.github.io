@@ -95,7 +95,7 @@
     .gesture-emoji { font-size: 18px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)); }
     .gesture-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.45); transition: all 0.25s ease; }
 
-    /* ---- RIGHT PANEL — ORBITAL ---- */
+    /* ---- RIGHT PANEL — PIE WHEEL ---- */
     .right-panel {
       position: fixed; top: 52%; transform: translateY(-50%);
       z-index: 10;
@@ -105,54 +105,72 @@
     .right-panel.p1 { left: calc(25vw - 180px); }
     .right-panel.p2 { left: calc(75vw - 180px); }
 
-    .orbital-container {
-      position: relative; width: 360px; height: 360px;
+    .pie-wheel-wrapper {
+      position: relative; width: 340px; height: 340px;
     }
-    .orbital-center {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-      width: 84px; height: 84px; border-radius: 50%;
-      border: 1.5px solid rgba(255,255,255,0.07);
-      background: rgba(18,18,24,0.4);
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 300; color: rgba(255,255,255,0.22); letter-spacing: 1px;
+    .pie-wheel-svg {
+      width: 100%; height: 100%;
+      filter: drop-shadow(0 4px 24px rgba(0,0,0,0.35));
     }
-    
-    .orbital-node {
-      position: absolute; width: 75px; height: 75px; border-radius: 50%;
-      background: rgba(22,22,30,0.6);
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,0.06);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    .pie-wheel-svg .pie-segment-path {
       cursor: pointer;
-      transition: all 0.25s cubic-bezier(.25,.46,.45,.94);
-      top: 50%; left: 50%;
-      --radius: 142px;
-      transform: translate(-50%,-50%) rotate(var(--angle)) translateY(calc(-1 * var(--radius))) rotate(calc(-1 * var(--angle)));
+      transition: filter 0.25s ease, opacity 0.25s ease;
+      stroke: rgba(0,0,0,0.55);
+      stroke-width: 2;
     }
-    
-    .right-panel.p1 .orbital-node.active {
-      background: rgba(0, 255, 136, 0.15);
-      border-color: #00ff88;
-      box-shadow: 0 0 16px rgba(0, 255, 136, 0.3), 0 0 32px rgba(0, 255, 136, 0.15);
-      transform: translate(-50%,-50%) rotate(var(--angle)) translateY(calc(-1 * var(--radius))) rotate(calc(-1 * var(--angle))) scale(1.12);
+    .pie-wheel-svg .pie-segment-path:hover {
+      filter: brightness(1.35);
     }
-    
-    .right-panel.p2 .orbital-node.active {
-      background: rgba(255, 110, 199, 0.15);
-      border-color: #ff6ec7;
-      box-shadow: 0 0 16px rgba(255, 110, 199, 0.3), 0 0 32px rgba(255, 110, 199, 0.15);
-      transform: translate(-50%,-50%) rotate(var(--angle)) translateY(calc(-1 * var(--radius))) rotate(calc(-1 * var(--angle))) scale(1.12);
+    .pie-wheel-svg .pie-segment-group.active .pie-segment-path {
+      filter: brightness(1.5) drop-shadow(0 0 8px rgba(255,255,255,0.3));
+      stroke: rgba(255,255,255,0.3);
+      stroke-width: 2.5;
+    }
+    .right-panel.p1 .pie-segment-group.active .pie-segment-path {
+      stroke: rgba(0,255,136,0.5);
+      filter: brightness(1.4) drop-shadow(0 0 12px rgba(0,255,136,0.35));
+    }
+    .right-panel.p2 .pie-segment-group.active .pie-segment-path {
+      stroke: rgba(255,110,199,0.5);
+      filter: brightness(1.4) drop-shadow(0 0 12px rgba(255,110,199,0.35));
+    }
+    .pie-wheel-svg .seg-emoji {
+      font-size: 22px;
+      pointer-events: none;
+    }
+    .pie-wheel-svg .seg-label {
+      fill: rgba(255,255,255,0.85);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      pointer-events: none;
+    }
+    .pie-wheel-svg .pie-center-circle {
+      fill: rgba(10,10,18,0.88);
+      stroke: rgba(255,255,255,0.07);
+      stroke-width: 1.5;
+    }
+    .pie-wheel-svg .pie-center-text {
+      fill: rgba(255,255,255,0.22);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 300;
+      letter-spacing: 1px;
+    }
+    /* Drag-over state for pie segments */
+    .pie-segment-group.drag-over .pie-segment-path {
+      stroke: rgba(255,255,255,0.5) !important;
+      stroke-width: 3 !important;
+      filter: brightness(1.6) drop-shadow(0 0 14px rgba(255,255,255,0.25)) !important;
+    }
+    /* Outer ring glow */
+    .pie-wheel-svg .pie-outer-ring {
+      fill: none;
+      stroke: rgba(255,255,255,0.06);
+      stroke-width: 1;
     }
 
-    .node-emoji { font-size: 22px; line-height: 1.1; }
-    .node-label {
-      font-size: 12px; font-weight: 600;
-      color: rgba(255, 255, 255, 0.7);
-      margin-top: 2px;
-    }
-
-    /* ---- Chord Toolbar (extras below orbital) ---- */
+    /* ---- Chord Toolbar (extras below pie) ---- */
     .chord-toolbar {
       display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
       margin-top: 8px; padding: 8px 10px;
@@ -192,16 +210,6 @@
     .toolbar-chip.dragging {
       opacity: 0.4; transform: scale(0.92);
     }
-
-    /* Drag-over state for orbital nodes */
-    .orbital-node.drag-over {
-      border-color: rgba(255,255,255,0.35) !important;
-      box-shadow: 0 0 20px rgba(255,255,255,0.15), inset 0 0 12px rgba(255,255,255,0.05) !important;
-      transform: translate(-50%,-50%) rotate(var(--angle)) translateY(calc(-1 * var(--radius))) rotate(calc(-1 * var(--angle))) scale(1.1);
-    }
-    /* Also allow orbital nodes to be draggable back to toolbar */
-    .orbital-node[draggable="true"] { cursor: grab; }
-    .orbital-node[draggable="true"]:active { cursor: grabbing; }
     .chord-toolbar.drag-over {
       border-color: rgba(255,255,255,0.18);
       background: rgba(30,30,45,0.6);
@@ -473,10 +481,9 @@
       width: 3px; height: 24px; border-radius: 2px;
       background: var(--accent-color);
     }
-    body.mode-single .right-panel.p1 .orbital-node.active {
-      background: hsla(var(--accent-hue), 60%, 68%, 0.18) !important;
-      border-color: var(--accent-color) !important;
-      box-shadow: 0 0 22px hsla(var(--accent-hue), 60%, 68%, 0.25) !important;
+    body.mode-single .right-panel.p1 .pie-segment-group.active .pie-segment-path {
+      stroke: var(--accent-color) !important;
+      filter: brightness(1.5) drop-shadow(0 0 14px hsla(var(--accent-hue), 60%, 68%, 0.35)) !important;
     }
     body.mode-single .left-panel.p1 .panel-header {
       color: var(--accent-color) !important;
@@ -814,24 +821,8 @@
 
   <div id="p1-right-panel" class="right-panel p1">
     <div class="panel-header">P1 Chord Type</div>
-    <div class="orbital-container">
-      <div class="orbital-center">pick</div>
-      <div class="orbital-node" data-quality="Major" draggable="true" style="--angle:270deg">
-        <span class="node-emoji">☀️</span>
-        <span class="node-label">Major</span>
-      </div>
-      <div class="orbital-node" data-quality="Dom7" draggable="true" style="--angle:0deg">
-        <span class="node-emoji">⚡</span>
-        <span class="node-label">Dom 7</span>
-      </div>
-      <div class="orbital-node" data-quality="Minor" draggable="true" style="--angle:90deg">
-        <span class="node-emoji">🌧️</span>
-        <span class="node-label">Minor</span>
-      </div>
-      <div class="orbital-node" data-quality="Dim" draggable="true" style="--angle:180deg">
-        <span class="node-emoji">🕳️</span>
-        <span class="node-label">Dim</span>
-      </div>
+    <div class="pie-wheel-wrapper">
+      <svg id="p1-pie-wheel" class="pie-wheel-svg" viewBox="0 0 340 340"></svg>
     </div>
     <div class="chord-toolbar" id="p1-chord-toolbar">
       <div class="toolbar-label">Drag to add</div>
@@ -846,6 +837,15 @@
       </div>
       <div class="toolbar-chip" draggable="true" data-quality="Min7">
         <span class="chip-emoji">🌊</span><span class="chip-label">Min 7</span>
+      </div>
+      <div class="toolbar-chip" draggable="true" data-quality="Min6">
+        <span class="chip-emoji">🌅</span><span class="chip-label">Min 6</span>
+      </div>
+      <div class="toolbar-chip" draggable="true" data-quality="Min7b5">
+        <span class="chip-emoji">🕯️</span><span class="chip-label">m7♭5</span>
+      </div>
+      <div class="toolbar-chip" draggable="true" data-quality="Maj6">
+        <span class="chip-emoji">🍂</span><span class="chip-label">Maj 6</span>
       </div>
     </div>
   </div>
@@ -868,24 +868,8 @@
 
   <div id="p2-right-panel" class="right-panel p2">
     <div class="panel-header">P2 Chord Type</div>
-    <div class="orbital-container">
-      <div class="orbital-center">pick</div>
-      <div class="orbital-node" data-quality="Major" draggable="true" style="--angle:270deg">
-        <span class="node-emoji">☀️</span>
-        <span class="node-label">Major</span>
-      </div>
-      <div class="orbital-node" data-quality="Dom7" draggable="true" style="--angle:0deg">
-        <span class="node-emoji">⚡</span>
-        <span class="node-label">Dom 7</span>
-      </div>
-      <div class="orbital-node" data-quality="Minor" draggable="true" style="--angle:90deg">
-        <span class="node-emoji">🌧️</span>
-        <span class="node-label">Minor</span>
-      </div>
-      <div class="orbital-node" data-quality="Dim" draggable="true" style="--angle:180deg">
-        <span class="node-emoji">🕳️</span>
-        <span class="node-label">Dim</span>
-      </div>
+    <div class="pie-wheel-wrapper">
+      <svg id="p2-pie-wheel" class="pie-wheel-svg" viewBox="0 0 340 340"></svg>
     </div>
     <div class="chord-toolbar" id="p2-chord-toolbar">
       <div class="toolbar-label">Drag to add</div>
@@ -900,6 +884,15 @@
       </div>
       <div class="toolbar-chip" draggable="true" data-quality="Min7">
         <span class="chip-emoji">🌊</span><span class="chip-label">Min 7</span>
+      </div>
+      <div class="toolbar-chip" draggable="true" data-quality="Min6">
+        <span class="chip-emoji">🌅</span><span class="chip-label">Min 6</span>
+      </div>
+      <div class="toolbar-chip" draggable="true" data-quality="Min7b5">
+        <span class="chip-emoji">🕯️</span><span class="chip-label">m7♭5</span>
+      </div>
+      <div class="toolbar-chip" draggable="true" data-quality="Maj6">
+        <span class="chip-emoji">🍂</span><span class="chip-label">Maj 6</span>
       </div>
     </div>
   </div>
@@ -1154,7 +1147,9 @@
       'Major': [0,4,7],       'Minor': [0,3,7],
       'Maj7':  [0,4,7,11],    'Min7':  [0,3,7,10],
       'Dom7':  [0,4,7,10],    'Dim':   [0,3,6],
-      'Sus4':  [0,5,7],       'Sus2':  [0,2,7]
+      'Sus4':  [0,5,7],       'Sus2':  [0,2,7],
+      'Min6':  [0,3,7,9],     'Min7b5':[0,3,6,10],
+      'Maj6':  [0,4,7,9]
     };
 
     // Harmony relationships (matching root+quality combinations)
@@ -1417,7 +1412,7 @@
       return null;
     }
 
-    // Right-Hand pointing hit test against player's orbital nodes
+    // Right-Hand pointing hit test against player's pie-wheel segments
     function detectRightHandPointingForPlayer(lm, playerNum) {
       const idxE = fingerExtended(lm, LM.INDEX_TIP, LM.INDEX_PIP);
       if (!idxE) return null;
@@ -1425,22 +1420,36 @@
       const tipX = (1 - lm[LM.INDEX_TIP].x) * canvas.width;
       const tipY = lm[LM.INDEX_TIP].y * canvas.height;
 
-      const selector = playerNum === 1 ? '#p1-right-panel .orbital-node' : '#p2-right-panel .orbital-node';
-      const nodes = document.querySelectorAll(selector);
-      let closest = null, closestDist = Infinity;
+      const wheelId = playerNum === 1 ? 'p1-pie-wheel' : 'p2-pie-wheel';
+      const svgEl = document.getElementById(wheelId);
+      if (!svgEl) return null;
+      const rect = svgEl.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dist = Math.hypot(tipX - cx, tipY - cy);
+      if (dist > POINT_HIT_RADIUS) return null;
 
-      for (const node of nodes) {
-        const rect = node.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-        const dist = Math.hypot(tipX - cx, tipY - cy);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closest = node.dataset.quality;
+      // Angle-based segment detection (0°=top, clockwise)
+      let angle = Math.atan2(tipX - cx, -(tipY - cy)) * 180 / Math.PI;
+      if (angle < 0) angle += 360;
+
+      const segments = svgEl.querySelectorAll('.pie-segment-group');
+      const segCount = segments.length;
+      if (segCount === 0) return null;
+      const segArc = 360 / segCount;
+
+      for (let i = 0; i < segCount; i++) {
+        const segStart = (i * segArc) % 360;
+        const segEnd = ((i + 1) * segArc) % 360;
+        let inSeg;
+        if (segStart < segEnd) {
+          inSeg = angle >= segStart && angle < segEnd;
+        } else {
+          inSeg = angle >= segStart || angle < segEnd;
         }
+        if (inSeg) return segments[i].dataset.quality;
       }
-
-      return (closestDist <= POINT_HIT_RADIUS) ? closest : null;
+      return null;
     }
 
     function checkHarmony(c1, c2) {
@@ -1521,7 +1530,7 @@
     function chordDisplayName(root, quality) {
       if (!root || root === 'Stop' || !quality) return '—';
       const rootLabel = root === 'C5' ? 'C (8va)' : root;
-      const m = { Major:'', Minor:'m', Maj7:'Maj7', Min7:'m7', Dom7:'7', Dim:'dim', Sus4:'sus4', Sus2:'sus2' };
+      const m = { Major:'', Minor:'m', Maj7:'Maj7', Min7:'m7', Dom7:'7', Dim:'dim', Sus4:'sus4', Sus2:'sus2', Min6:'m6', Min7b5:'m7♭5', Maj6:'6' };
       return rootLabel + (m[quality] ?? quality);
     }
 
@@ -2831,7 +2840,9 @@
       'Major': 'Bright & Full', 'Minor': 'Dark & Melancholic',
       'Dom7': 'Tense & Drive', 'Min7': 'Cool & Floating',
       'Maj7': 'Dreamy & Open', 'Dim': 'Dissonant & Edge',
-      'Sus4': 'Tension & Release', 'Sus2': 'Airy & Suspended'
+      'Sus4': 'Tension & Release', 'Sus2': 'Airy & Suspended',
+      'Min6': 'Warm & Bittersweet', 'Min7b5': 'Haunting & Fragile',
+      'Maj6': 'Nostalgic & Golden'
     };
 
     let currentAccentHue = 145;
@@ -2953,6 +2964,51 @@
             break;
           }
           case 'Maj7': // Crescent moon
+            inner = this.echoPath(CRESCENT, 6, 0.34);
+            break;
+          case 'Min6': { // Sunset horizon — warm glow
+            // Sun disk
+            inner += '<circle cx="0" cy="6" r="22" fill="currentColor" opacity="0.7" style="animation: glyphFadeIn 0.6s 0.2s both"/>';
+            // Horizon line
+            inner += '<line x1="-64" y1="24" x2="64" y2="24" stroke="currentColor" stroke-width="2.5" opacity="0.85" style="animation: glyphDrawOn 0.8s 0.1s both"/>';
+            // Rays above horizon
+            for (let i = 0; i < 7; i++) {
+              const a = (160 + i * 28.5) * Math.PI / 180;
+              const c = Math.cos(a), s = Math.sin(a);
+              inner += `<path d="M${(c*30).toFixed(1)},${(s*30+6).toFixed(1)} L${(c*52).toFixed(1)},${(s*52+6).toFixed(1)}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6" style="animation: glyphDrawOn 0.5s ${0.3+i*0.06}s ease-in-out both"/>`;
+            }
+            // Reflection ripples
+            for (let i = 0; i < 3; i++) {
+              inner += `<path d="M-${32-i*8},${34+i*12} Q0,${28+i*12} ${32-i*8},${34+i*12}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="${0.35-i*0.08}" style="animation: glyphWave 3s ${i*0.4}s ease-out infinite"/>`;
+            }
+            break;
+          }
+          case 'Min7b5': { // Candle flame — flickering
+            // Candle body
+            inner += '<rect x="-8" y="10" width="16" height="40" rx="3" fill="currentColor" opacity="0.5" style="animation: glyphFadeIn 0.5s both"/>';
+            // Wick
+            inner += '<line x1="0" y1="10" x2="0" y2="2" stroke="currentColor" stroke-width="2" opacity="0.7"/>';
+            // Flame
+            inner += '<path d="M0,-40 C14,-26 14,-4 0,2 C-14,-4 -14,-26 0,-40 Z" fill="currentColor" opacity="0.8" style="animation: glyphPulse 1.5s ease-in-out infinite"/>';
+            // Inner flame
+            inner += '<path d="M0,-28 C7,-18 7,-4 0,0 C-7,-4 -7,-18 0,-28 Z" fill="currentColor" opacity="0.4" style="animation: glyphPulse 1.2s 0.3s ease-in-out infinite"/>';
+            // Glow halo
+            inner += '<circle cx="0" cy="-18" r="24" fill="currentColor" opacity="0.08" style="animation: glyphPulse 2s ease-in-out infinite"/>';
+            wrapClass = 'glyph-flicker';
+            break;
+          }
+          case 'Maj6': { // Falling leaves — nostalgic drift
+            const LEAF_SMALL = 'M0,-14 C8,-8 8,8 0,14 C-8,8 -8,-8 0,-14 Z';
+            for (let i = 0; i < 5; i++) {
+              const x = -40 + i * 20;
+              const rot = [25, -15, 40, -30, 10][i];
+              const delay = i * 0.35;
+              const opacity = 0.5 + i * 0.1;
+              inner += `<g transform="translate(${x},0) rotate(${rot})" opacity="${opacity}" style="animation: glyphSandDrop 3s ${delay}s ease-in infinite"><path d="${LEAF_SMALL}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="0" y1="-12" x2="0" y2="12" stroke="currentColor" stroke-width="1" opacity="0.6"/></g>`;
+            }
+            wrapClass = 'glyph-sway';
+            break;
+          }
           default:
             inner = this.echoPath(CRESCENT, 6, 0.34);
             break;
@@ -3842,9 +3898,9 @@
         if (card.dataset.note === p1StableRoot) card.classList.add('active');
         else card.classList.remove('active');
       });
-      document.querySelectorAll('#p1-right-panel .orbital-node').forEach(node => {
-        if (node.dataset.quality === p1StableQuality) node.classList.add('active');
-        else node.classList.remove('active');
+      document.querySelectorAll('#p1-pie-wheel .pie-segment-group').forEach(seg => {
+        if (seg.dataset.quality === p1StableQuality) seg.classList.add('active');
+        else seg.classList.remove('active');
       });
 
       // Update Player 2 card highlights (duo mode only)
@@ -3853,9 +3909,9 @@
           if (card.dataset.note === p2StableRoot) card.classList.add('active');
           else card.classList.remove('active');
         });
-        document.querySelectorAll('#p2-right-panel .orbital-node').forEach(node => {
-          if (node.dataset.quality === p2StableQuality) node.classList.add('active');
-          else node.classList.remove('active');
+        document.querySelectorAll('#p2-pie-wheel .pie-segment-group').forEach(seg => {
+          if (seg.dataset.quality === p2StableQuality) seg.classList.add('active');
+          else seg.classList.remove('active');
         });
       }
 
@@ -3927,10 +3983,86 @@
         });
       });
 
-      // Orbital node click selection (manual quality fallback)
-      document.querySelectorAll('.orbital-node').forEach(node => {
-        node.addEventListener('click', () => {
-          const q = node.dataset.quality;
+      // ---- PIE WHEEL SVG BUILDER ----
+      const QUALITY_META = {
+        'Major':  { emoji: '☀️', label: 'Major',  color: 'rgba(180,160,60,0.28)' },
+        'Dom7':   { emoji: '⚡',  label: 'Dom 7',  color: 'rgba(60,80,180,0.28)' },
+        'Minor':  { emoji: '🌧️', label: 'Minor',  color: 'rgba(60,160,160,0.28)' },
+        'Dim':    { emoji: '🕳️', label: 'Dim',    color: 'rgba(140,50,70,0.28)' },
+        'Maj7':   { emoji: '🌙', label: 'Maj 7',  color: 'rgba(80,60,160,0.28)' },
+        'Min7':   { emoji: '🌊', label: 'Min 7',  color: 'rgba(40,120,180,0.28)' },
+        'Sus4':   { emoji: '⏳',  label: 'Sus 4',  color: 'rgba(80,140,80,0.28)' },
+        'Sus2':   { emoji: '🫧', label: 'Sus 2',  color: 'rgba(120,100,180,0.28)' },
+        'Min6':   { emoji: '🌅', label: 'Min 6',  color: 'rgba(200,120,60,0.28)' },
+        'Min7b5': { emoji: '🕯️', label: 'm7♭5',   color: 'rgba(100,70,100,0.28)' },
+        'Maj6':   { emoji: '🍂', label: 'Maj 6',  color: 'rgba(180,130,40,0.28)' },
+      };
+
+      function arcPath(cx, cy, outerR, innerR, startDeg, endDeg) {
+        const toRad = (deg) => (deg - 90) * Math.PI / 180;
+        const x1 = cx + outerR * Math.cos(toRad(startDeg));
+        const y1 = cy + outerR * Math.sin(toRad(startDeg));
+        const x2 = cx + outerR * Math.cos(toRad(endDeg));
+        const y2 = cy + outerR * Math.sin(toRad(endDeg));
+        const x3 = cx + innerR * Math.cos(toRad(endDeg));
+        const y3 = cy + innerR * Math.sin(toRad(endDeg));
+        const x4 = cx + innerR * Math.cos(toRad(startDeg));
+        const y4 = cy + innerR * Math.sin(toRad(startDeg));
+        const span = ((endDeg - startDeg) + 360) % 360;
+        const large = span > 180 ? 1 : 0;
+        return `M${x1.toFixed(2)},${y1.toFixed(2)} A${outerR},${outerR} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} L${x3.toFixed(2)},${y3.toFixed(2)} A${innerR},${innerR} 0 ${large} 0 ${x4.toFixed(2)},${y4.toFixed(2)} Z`;
+      }
+
+      function buildPieWheel(svgEl, qualities) {
+        const cx = 170, cy = 170, outerR = 160, innerR = 58;
+        const n = qualities.length;
+        const gap = 3; // degrees gap between segments
+        const segArc = 360 / n;
+        let svg = '';
+
+        // Outer ring
+        svg += `<circle class="pie-outer-ring" cx="${cx}" cy="${cy}" r="${outerR}"/>`;
+
+        for (let i = 0; i < n; i++) {
+          const q = qualities[i];
+          const meta = QUALITY_META[q] || { emoji: '❓', label: q, color: 'rgba(80,80,80,0.28)' };
+          const startA = i * segArc + gap / 2;
+          const endA = (i + 1) * segArc - gap / 2;
+          const midA = (startA + endA) / 2;
+          const midR = (outerR + innerR) / 2;
+          const toRad = (deg) => (deg - 90) * Math.PI / 180;
+          const textX = cx + midR * Math.cos(toRad(midA));
+          const textY = cy + midR * Math.sin(toRad(midA));
+
+          const path = arcPath(cx, cy, outerR, innerR, startA, endA);
+
+          svg += `<g class="pie-segment-group" data-quality="${q}" data-index="${i}">`;
+          svg += `<path class="pie-segment-path" d="${path}" fill="${meta.color}"/>`;
+          svg += `<text class="seg-emoji" x="${textX.toFixed(1)}" y="${(textY - 6).toFixed(1)}" text-anchor="middle" dominant-baseline="central">${meta.emoji}</text>`;
+          svg += `<text class="seg-label" x="${textX.toFixed(1)}" y="${(textY + 14).toFixed(1)}" text-anchor="middle" dominant-baseline="central">${meta.label}</text>`;
+          svg += `</g>`;
+        }
+
+        // Center circle
+        svg += `<circle class="pie-center-circle" cx="${cx}" cy="${cy}" r="${innerR}"/>`;
+        svg += `<text class="pie-center-text" x="${cx}" y="${cy + 1}" text-anchor="middle" dominant-baseline="central">pick</text>`;
+
+        svgEl.innerHTML = svg;
+      }
+
+      // Default 4 qualities for each player's pie wheel
+      const DEFAULT_PIE_QUALITIES = ['Major', 'Dom7', 'Minor', 'Dim'];
+      const p1PieQualities = [...DEFAULT_PIE_QUALITIES];
+      const p2PieQualities = [...DEFAULT_PIE_QUALITIES];
+
+      // Build initial pie wheels
+      buildPieWheel(document.getElementById('p1-pie-wheel'), p1PieQualities);
+      buildPieWheel(document.getElementById('p2-pie-wheel'), p2PieQualities);
+
+      // Pie segment click selection
+      document.querySelectorAll('.pie-segment-group').forEach(seg => {
+        seg.addEventListener('click', () => {
+          const q = seg.dataset.quality;
           if (q) {
             p1StableQuality = q;
             p1LastRawQuality = q;
@@ -3939,29 +4071,18 @@
         });
       });
 
-      // ---- Chord Toolbar: Drag-and-Drop Swap ----
-      const QUALITY_META = {
-        'Major': { emoji: '☀️', label: 'Major' },
-        'Dom7':  { emoji: '⚡', label: 'Dom 7' },
-        'Minor': { emoji: '🌧️', label: 'Minor' },
-        'Dim':   { emoji: '🕳️', label: 'Dim' },
-        'Maj7':  { emoji: '🌙', label: 'Maj 7' },
-        'Min7':  { emoji: '🌊', label: 'Min 7' },
-        'Sus4':  { emoji: '⏳', label: 'Sus 4' },
-        'Sus2':  { emoji: '🫧', label: 'Sus 2' },
-      };
+      // ---- Chord Toolbar: Drag-and-Drop onto Pie Wheel ----
+      let dragSource = null;
 
-      let dragSource = null;   // { element, type: 'chip'|'node', quality }
-
-      function initChordToolbarDnD(panelId, toolbarId) {
-        const panel = document.getElementById(panelId);
+      function initPieToolbarDnD(wheelId, toolbarId, pieQualities) {
+        const svgEl = document.getElementById(wheelId);
         const toolbar = document.getElementById(toolbarId);
-        if (!panel || !toolbar) return;
+        const wrapper = svgEl?.closest('.pie-wheel-wrapper');
+        if (!svgEl || !toolbar || !wrapper) return;
 
-        const orbitalNodes = panel.querySelectorAll('.orbital-node');
         const toolbarChips = toolbar.querySelectorAll('.toolbar-chip');
 
-        // --- Toolbar chip drag start ---
+        // Toolbar chip drag start
         toolbarChips.forEach(chip => {
           chip.addEventListener('dragstart', (e) => {
             dragSource = { element: chip, type: 'chip', quality: chip.dataset.quality };
@@ -3971,70 +4092,84 @@
           });
           chip.addEventListener('dragend', () => {
             chip.classList.remove('dragging');
-            clearAllDragOver(panel, toolbar);
+            svgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            toolbar.classList.remove('drag-over');
             dragSource = null;
           });
         });
 
-        // --- Orbital node drag start (drag node back to toolbar) ---
-        orbitalNodes.forEach(node => {
-          node.addEventListener('dragstart', (e) => {
-            dragSource = { element: node, type: 'node', quality: node.dataset.quality };
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', node.dataset.quality);
-          });
-          node.addEventListener('dragend', () => {
-            clearAllDragOver(panel, toolbar);
-            dragSource = null;
-          });
-        });
-
-        // --- Orbital nodes as drop targets (for toolbar chips) ---
-        orbitalNodes.forEach(node => {
-          node.addEventListener('dragover', (e) => {
-            if (!dragSource || dragSource.type !== 'chip') return;
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            node.classList.add('drag-over');
-          });
-          node.addEventListener('dragleave', () => {
-            node.classList.remove('drag-over');
-          });
-          node.addEventListener('drop', (e) => {
-            e.preventDefault();
-            node.classList.remove('drag-over');
-            if (!dragSource || dragSource.type !== 'chip') return;
-
-            const incomingQuality = dragSource.quality;
-            const outgoingQuality = node.dataset.quality;
-            if (incomingQuality === outgoingQuality) return;
-
-            // Swap: orbital node gets the incoming quality
-            const inMeta = QUALITY_META[incomingQuality];
-            node.dataset.quality = incomingQuality;
-            node.querySelector('.node-emoji').textContent = inMeta.emoji;
-            node.querySelector('.node-label').textContent = inMeta.label;
-
-            // Toolbar chip gets the outgoing quality
-            const outMeta = QUALITY_META[outgoingQuality];
-            dragSource.element.dataset.quality = outgoingQuality;
-            dragSource.element.querySelector('.chip-emoji').textContent = outMeta.emoji;
-            dragSource.element.querySelector('.chip-label').textContent = outMeta.label;
-
-            // Animate the swapped node briefly
-            node.style.transition = 'transform 0.3s cubic-bezier(.25,.46,.45,.94), box-shadow 0.3s ease';
-            node.classList.add('drag-over');
-            setTimeout(() => node.classList.remove('drag-over'), 350);
-
-            dragSource = null;
-          });
-        });
-
-        // --- Toolbar as drop target (for orbital nodes dragged back) ---
-        toolbar.addEventListener('dragover', (e) => {
-          if (!dragSource || dragSource.type !== 'node') return;
+        // Pie wheel wrapper as drop target
+        wrapper.addEventListener('dragover', (e) => {
+          if (!dragSource || dragSource.type !== 'chip') return;
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
+
+          // Highlight the segment under pointer using angle
+          const rect = svgEl.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          let angle = Math.atan2(e.clientX - cx, -(e.clientY - cy)) * 180 / Math.PI;
+          if (angle < 0) angle += 360;
+          const segArc = 360 / pieQualities.length;
+          const idx = Math.floor(angle / segArc);
+
+          svgEl.querySelectorAll('.pie-segment-group').forEach((seg, i) => {
+            seg.classList.toggle('drag-over', i === idx);
+          });
+        });
+
+        wrapper.addEventListener('dragleave', (e) => {
+          if (!wrapper.contains(e.relatedTarget)) {
+            svgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+          }
+        });
+
+        wrapper.addEventListener('drop', (e) => {
+          e.preventDefault();
+          svgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+          if (!dragSource || dragSource.type !== 'chip') return;
+
+          const incoming = dragSource.quality;
+          // Find which segment was targeted by angle
+          const rect = svgEl.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          let angle = Math.atan2(e.clientX - cx, -(e.clientY - cy)) * 180 / Math.PI;
+          if (angle < 0) angle += 360;
+          const segArc = 360 / pieQualities.length;
+          const idx = Math.floor(angle / segArc);
+          if (idx < 0 || idx >= pieQualities.length) return;
+
+          const outgoing = pieQualities[idx];
+          if (incoming === outgoing) return;
+
+          // Swap: put incoming in pie, put outgoing back in toolbar chip
+          pieQualities[idx] = incoming;
+          const outMeta = QUALITY_META[outgoing];
+          dragSource.element.dataset.quality = outgoing;
+          dragSource.element.querySelector('.chip-emoji').textContent = outMeta.emoji;
+          dragSource.element.querySelector('.chip-label').textContent = outMeta.label;
+
+          // Rebuild pie wheel
+          buildPieWheel(svgEl, pieQualities);
+          // Re-attach click handlers
+          svgEl.querySelectorAll('.pie-segment-group').forEach(seg => {
+            seg.addEventListener('click', () => {
+              const q = seg.dataset.quality;
+              if (q) {
+                p1StableQuality = q;
+                p1LastRawQuality = q;
+                p1QualitySince = performance.now();
+              }
+            });
+          });
+
+          dragSource = null;
+        });
+
+        // Toolbar as drop target (not used for now, kept for future)
+        toolbar.addEventListener('dragover', (e) => {
+          e.preventDefault();
           toolbar.classList.add('drag-over');
         });
         toolbar.addEventListener('dragleave', () => {
@@ -4043,39 +4178,12 @@
         toolbar.addEventListener('drop', (e) => {
           e.preventDefault();
           toolbar.classList.remove('drag-over');
-          if (!dragSource || dragSource.type !== 'node') return;
-
-          // Find the first toolbar chip to swap with
-          const firstChip = toolbar.querySelector('.toolbar-chip');
-          if (!firstChip) return;
-
-          const nodeQuality = dragSource.quality;
-          const chipQuality = firstChip.dataset.quality;
-          if (nodeQuality === chipQuality) return;
-
-          // Swap: node gets chip quality, chip gets node quality
-          const chipMeta = QUALITY_META[chipQuality];
-          dragSource.element.dataset.quality = chipQuality;
-          dragSource.element.querySelector('.node-emoji').textContent = chipMeta.emoji;
-          dragSource.element.querySelector('.node-label').textContent = chipMeta.label;
-
-          const nodeMeta = QUALITY_META[nodeQuality];
-          firstChip.dataset.quality = nodeQuality;
-          firstChip.querySelector('.chip-emoji').textContent = nodeMeta.emoji;
-          firstChip.querySelector('.chip-label').textContent = nodeMeta.label;
-
-          dragSource = null;
         });
       }
 
-      function clearAllDragOver(panel, toolbar) {
-        panel.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        toolbar.classList.remove('drag-over');
-      }
-
       // Initialize drag-and-drop for both player panels
-      initChordToolbarDnD('p1-right-panel', 'p1-chord-toolbar');
-      initChordToolbarDnD('p2-right-panel', 'p2-chord-toolbar');
+      initPieToolbarDnD('p1-pie-wheel', 'p1-chord-toolbar', p1PieQualities);
+      initPieToolbarDnD('p2-pie-wheel', 'p2-chord-toolbar', p2PieQualities);
 
       // Filters
       const hp = document.getElementById('hp-filter');
