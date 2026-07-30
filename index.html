@@ -3075,8 +3075,8 @@
         // Per-hand warm string FMSynth
         // Sine carrier + triangle modulator at low harmonicity = bowed-string character
         const synthConfigs = [
-          { harm: 2, modIdx: 1.0, lpFreq: 2000 },    // Hand 1: octave ratio (clean)
-          { harm: 3, modIdx: 0.8, lpFreq: 1800 }     // Hand 2: 12th ratio (clean, different color)
+          { harm: 1.5, modIdx: 1.2, lpFreq: 2000 },   // Hand 1
+          { harm: 1.8, modIdx: 1.0, lpFreq: 1800 }    // Hand 2: slightly different color
         ];
 
         for (let h = 0; h < 2; h++) {
@@ -3192,8 +3192,14 @@
         const allExtended = idxE && midE && rngE && pnkE;
         const allCurled   = !idxE && !midE && !rngE && !pnkE;
 
+        // ☝️ Index finger only = sharp modifier (raise semitone)
+        const indexOnly = idxE && !midE && !rngE && !pnkE;
+        this.hSharp = this.hSharp || [false, false];
+        this.hSharp[handIdx] = indexOnly;
+
         if (allExtended) return 'glissando';
         if (allCurled)   return 'legato';
+        if (indexOnly)   return this.hArtic[handIdx]; // keep current mode, just add sharp
 
         return this.hArtic[handIdx];
       },
@@ -3386,27 +3392,31 @@
         const tipY = wrist.y * canvas.height;
 
         if (synth) {
+          const SEMITONE = Math.pow(2, 1/12); // ~1.0595
+          const isSharp = this.hSharp && this.hSharp[h];
+
           if (artic === 'glissando') {
             // ✋ Open Palm: quantized glissando — snap to scale notes, slide between them
-            const targetFreq = this.mapXToFreq(mirroredX);
+            let targetFreq = this.mapXToFreq(mirroredX);
             const snappedNote = this._findClosestScaleNote(targetFreq);
             if (snappedNote) activeScaleNotes.push(snappedNote);
 
-            const snappedFreq = this.noteNameToFreq(snappedNote);
+            let snappedFreq = this.noteNameToFreq(snappedNote);
+            // ☝️ Sharp modifier: raise by one semitone
+            if (isSharp) snappedFreq *= SEMITONE;
+
             const prevSnapped = this.hSnappedNote[h];
+            const pitchKey = snappedNote + (isSharp ? '#' : '');
 
             if (!this.hPitch[h]) {
-              // First contact — trigger at snapped note
-              this.hSnappedNote[h] = snappedNote;
+              this.hSnappedNote[h] = pitchKey;
               synth.triggerAttack(snappedFreq, Tone.now(), 0.75);
-              this.hPitch[h] = snappedNote;
-            } else if (snappedNote !== prevSnapped) {
-              // Moving to a different note — smooth slide
-              this.hSnappedNote[h] = snappedNote;
+              this.hPitch[h] = pitchKey;
+            } else if (pitchKey !== prevSnapped) {
+              this.hSnappedNote[h] = pitchKey;
               synth.frequency.rampTo(snappedFreq, 0.12);
-              this.hPitch[h] = snappedNote;
+              this.hPitch[h] = pitchKey;
             }
-            // Same note as before — hold steady, no frequency change (no microtones)
 
             // Trail
             this.hTrail[h].push({ x: tipX, y: tipY, t: now });
@@ -3418,12 +3428,19 @@
             const pitch = this.mapXToPitch(mirroredX);
             activeScaleNotes.push(pitch);
 
-            if (pitch !== this.hPitch[h] && (now - this.hLastNoteTime[h]) > this.noteDebounceMs) {
-              this.hPitch[h] = pitch;
-              this.hSnappedNote[h] = pitch;
+            // ☝️ Sharp modifier: raise by one semitone
+            let finalPitch = pitch;
+            if (isSharp) {
+              finalPitch = Tone.Frequency(pitch).transpose(1).toNote();
+            }
+            const pitchKey = finalPitch;
+
+            if (pitchKey !== this.hPitch[h] && (now - this.hLastNoteTime[h]) > this.noteDebounceMs) {
+              this.hPitch[h] = pitchKey;
+              this.hSnappedNote[h] = pitchKey;
               this.hLastNoteTime[h] = now;
               try { synth.triggerRelease(Tone.now()); } catch(e) {}
-              synth.triggerAttack(pitch, Tone.now() + 0.012, volLevel);
+              synth.triggerAttack(finalPitch, Tone.now() + 0.012, volLevel);
             }
 
             this.hTrail[h] = [];
