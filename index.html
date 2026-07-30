@@ -834,7 +834,7 @@
       </div>
     </div>
     <div class="chord-toolbar" id="p1-chord-toolbar">
-      <div class="toolbar-label">Drag to swap</div>
+      <div class="toolbar-label">Drag to add</div>
       <div class="toolbar-chip" draggable="true" data-quality="Maj7">
         <span class="chip-emoji">🌙</span><span class="chip-label">Maj 7</span>
       </div>
@@ -888,7 +888,7 @@
       </div>
     </div>
     <div class="chord-toolbar" id="p2-chord-toolbar">
-      <div class="toolbar-label">Drag to swap</div>
+      <div class="toolbar-label">Drag to add</div>
       <div class="toolbar-chip" draggable="true" data-quality="Maj7">
         <span class="chip-emoji">🌙</span><span class="chip-label">Maj 7</span>
       </div>
@@ -4206,16 +4206,16 @@
         locateFile: f => `./libs/hands/${f}`
       });
       mpHandsInstance.setOptions({
-        maxNumHands: 4,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.7,
-        minTrackingConfidence: 0.6
+        maxNumHands: 2,
+        modelComplexity: 0,
+        minDetectionConfidence: 0.65,
+        minTrackingConfidence: 0.5
       });
       mpHandsInstance.onResults(onResults);
 
       const cam = new Camera(videoEl, {
         onFrame: async () => { await mpHandsInstance.send({ image: videoEl }); },
-        width: 1280, height: 720
+        width: 960, height: 540
       });
       cam.start();
     }
@@ -4246,6 +4246,11 @@
 
         playMode = mode;
         silenceAll();
+
+        // Dynamically adjust hand tracking for performance
+        if (mpHandsInstance) {
+          mpHandsInstance.setOptions({ maxNumHands: mode === 'duo' ? 4 : 2 });
+        }
 
         // Remove all mode classes
         document.body.classList.remove('mode-single', 'mode-duo', 'mode-solo-accomp');
