@@ -3075,8 +3075,8 @@
         // Per-hand warm string FMSynth
         // Sine carrier + triangle modulator at low harmonicity = bowed-string character
         const synthConfigs = [
-          { harm: 1.5, modIdx: 1.2, lpFreq: 2000 },   // Hand 1
-          { harm: 1.8, modIdx: 1.0, lpFreq: 1800 }    // Hand 2: slightly different color
+          { harm: 2, modIdx: 1.0, lpFreq: 2000 },    // Hand 1: octave ratio (clean)
+          { harm: 3, modIdx: 0.8, lpFreq: 1800 }     // Hand 2: 12th ratio (clean, different color)
         ];
 
         for (let h = 0; h < 2; h++) {
@@ -3471,12 +3471,12 @@
 
         const hands = (results.multiHandLandmarks || []).slice(0, 2);
         const activeScaleNotes = [];
-        let displayPitch = null;
+        const displayPitches = [];
 
         // Process each detected hand
         for (let h = 0; h < hands.length; h++) {
           const pitch = this.processOneHand(hands[h], h, ctx, now, activeScaleNotes);
-          if (h === 0) displayPitch = pitch;
+          if (pitch) displayPitches.push(pitch.replace(/\d+$/, ''));
         }
 
         // Release synths for hands that disappeared
@@ -3488,9 +3488,15 @@
           }
         }
 
-        // HUD (show hand 1 info)
+        // HUD — show notes from all hands (e.g. "A + B")
         const noteEl = document.getElementById('sa-note-display');
-        if (noteEl) noteEl.textContent = displayPitch ? displayPitch.replace(/\d+$/, '') : '—';
+        if (noteEl) noteEl.textContent = displayPitches.length > 0 ? displayPitches.join(' + ') : '—';
+
+        // Update expression & reverb bar widths
+        const exprBar = document.getElementById('sa-expr-bar');
+        if (exprBar) exprBar.style.width = (this.smoothExpr[0] * 100).toFixed(0) + '%';
+        const reverbBar = document.getElementById('sa-reverb-bar');
+        if (reverbBar) reverbBar.style.width = (this.smoothReverb * 100).toFixed(0) + '%';
 
         // Note guide (highlight notes from both hands)
         this.drawNoteGuide(ctx, activeScaleNotes);
@@ -4031,149 +4037,99 @@
       }
 
       // Attach click handlers for pie segments (click to select quality)
-      function attachPieClickHandlers(svgEl, playerNum) {
-        svgEl.querySelectorAll('.pie-segment-group').forEach(seg => {
-          seg.addEventListener('click', () => {
-            const q = seg.dataset.quality;
-            if (!q) return;
-            if (playerNum === 1) {
-              p1StableQuality = q;
-              p1LastRawQuality = q;
-              p1QualitySince = performance.now();
-            } else {
-              p2StableQuality = q;
-              p2LastRawQuality = q;
-              p2QualitySince = performance.now();
-            }
-          });
-        });
-      }
-
-      // Full rebuild: pie + toolbar + event listeners
-      function fullRebuild(svgEl, toolbarEl, pieQualities, playerNum) {
-        buildPieWheel(svgEl, pieQualities);
-        rebuildToolbar(toolbarEl, pieQualities);
-        attachPieClickHandlers(svgEl, playerNum);
-        attachPieRemoveHandlers(svgEl, toolbarEl, pieQualities, playerNum);
-        attachToolbarDragHandlers(svgEl, toolbarEl, pieQualities, playerNum);
-      }
-
-      // Right-click pie segment to remove it back to toolbar
-      function attachPieRemoveHandlers(svgEl, toolbarEl, pieQualities, playerNum) {
-        svgEl.querySelectorAll('.pie-segment-group').forEach(seg => {
-          seg.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            if (pieQualities.length <= 1) return; // must keep at least 1
-            const q = seg.dataset.quality;
-            const idx = pieQualities.indexOf(q);
-            if (idx >= 0) {
-              pieQualities.splice(idx, 1);
-              fullRebuild(svgEl, toolbarEl, pieQualities, playerNum);
-            }
-          });
-        });
-      }
-
-      // Attach drag handlers to toolbar chips (re-called after toolbar rebuild)
-      function attachToolbarDragHandlers(svgEl, toolbarEl, pieQualities, playerNum) {
+      // Use event delegation — listeners set ONCE on SVG, work across rebuilds
+      function setupPieSystem(wheelId, toolbarId, pieQualities, playerNum) {
+        const svgEl = document.getElementById(wheelId);
+        const toolbarEl = document.getElementById(toolbarId);
         const wrapper = svgEl.closest('.pie-wheel-wrapper');
-        if (!wrapper) return;
+        if (!svgEl || !toolbarEl || !wrapper) return;
 
-        toolbarEl.querySelectorAll('.toolbar-chip').forEach(chip => {
-          chip.addEventListener('dragstart', (e) => {
-            dragSource = { element: chip, type: 'chip', quality: chip.dataset.quality };
-            chip.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'copy';
-            e.dataTransfer.setData('text/plain', chip.dataset.quality);
-          });
-          chip.addEventListener('dragend', () => {
-            chip.classList.remove('dragging');
-            svgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-            dragSource = null;
-          });
-        });
+        function refresh() {
+          buildPieWheel(svgEl, pieQualities);
+          rebuildToolbar(toolbarEl, pieQualities);
+        }
 
-        // Remove old listeners by cloning wrapper (prevents stacking)
-        const newWrapper = wrapper.cloneNode(true);
-        wrapper.parentNode.replaceChild(newWrapper, wrapper);
-        // Re-query svgEl from the new wrapper
-        const newSvgEl = newWrapper.querySelector('.pie-wheel-svg');
-
-        // Re-attach click + right-click on the cloned SVG
-        attachPieClickHandlers(newSvgEl, playerNum);
-        newSvgEl.querySelectorAll('.pie-segment-group').forEach(seg => {
-          seg.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            if (pieQualities.length <= 1) return;
-            const q = seg.dataset.quality;
-            const idx = pieQualities.indexOf(q);
-            if (idx >= 0) {
-              pieQualities.splice(idx, 1);
-              buildPieWheel(newSvgEl, pieQualities);
-              rebuildToolbar(toolbarEl, pieQualities);
-              attachToolbarDragHandlers(newSvgEl, toolbarEl, pieQualities, playerNum);
-              attachPieClickHandlers(newSvgEl, playerNum);
-            }
-          });
-        });
-
-        // Pie wheel as drop target — ADD (not swap)
-        newWrapper.addEventListener('dragover', (e) => {
-          if (!dragSource || dragSource.type !== 'chip') return;
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'copy';
-          // Glow the whole wheel
-          newSvgEl.querySelectorAll('.pie-segment-group').forEach(seg => seg.classList.add('drag-over'));
-        });
-
-        newWrapper.addEventListener('dragleave', (e) => {
-          if (!newWrapper.contains(e.relatedTarget)) {
-            newSvgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        // --- SVG: click to select quality (delegated) ---
+        svgEl.addEventListener('click', (e) => {
+          const seg = e.target.closest('.pie-segment-group');
+          if (!seg) return;
+          const q = seg.dataset.quality;
+          if (!q) return;
+          if (playerNum === 1) {
+            p1StableQuality = q; p1LastRawQuality = q; p1QualitySince = performance.now();
+          } else {
+            p2StableQuality = q; p2LastRawQuality = q; p2QualitySince = performance.now();
           }
         });
 
-        newWrapper.addEventListener('drop', (e) => {
+        // --- SVG: right-click to remove from pie (delegated) ---
+        svgEl.addEventListener('contextmenu', (e) => {
+          const seg = e.target.closest('.pie-segment-group');
+          if (!seg) return;
           e.preventDefault();
-          newSvgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+          if (pieQualities.length <= 1) return;
+          const q = seg.dataset.quality;
+          const idx = pieQualities.indexOf(q);
+          if (idx >= 0) {
+            pieQualities.splice(idx, 1);
+            refresh();
+          }
+        });
+
+        // --- Toolbar: drag start (delegated on toolbar container) ---
+        toolbarEl.addEventListener('dragstart', (e) => {
+          const chip = e.target.closest('.toolbar-chip');
+          if (!chip) return;
+          dragSource = { element: chip, type: 'chip', quality: chip.dataset.quality };
+          chip.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'copy';
+          e.dataTransfer.setData('text/plain', chip.dataset.quality);
+        });
+
+        toolbarEl.addEventListener('dragend', (e) => {
+          const chip = e.target.closest('.toolbar-chip');
+          if (chip) chip.classList.remove('dragging');
+          svgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+          dragSource = null;
+        });
+
+        // --- Wrapper: drop target for adding chips to pie ---
+        wrapper.addEventListener('dragover', (e) => {
+          if (!dragSource || dragSource.type !== 'chip') return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          svgEl.querySelectorAll('.pie-segment-group').forEach(seg => seg.classList.add('drag-over'));
+        });
+
+        wrapper.addEventListener('dragleave', (e) => {
+          if (!wrapper.contains(e.relatedTarget)) {
+            svgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+          }
+        });
+
+        wrapper.addEventListener('drop', (e) => {
+          e.preventDefault();
+          svgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
           if (!dragSource || dragSource.type !== 'chip') return;
 
           const incoming = dragSource.quality;
-          if (pieQualities.includes(incoming)) return; // already in pie
-          if (pieQualities.length >= 11) return; // max
+          if (pieQualities.includes(incoming) || pieQualities.length >= 11) return;
 
-          // ADD to pie
           pieQualities.push(incoming);
-          buildPieWheel(newSvgEl, pieQualities);
-          rebuildToolbar(toolbarEl, pieQualities);
-          attachToolbarDragHandlers(newSvgEl, toolbarEl, pieQualities, playerNum);
-          attachPieClickHandlers(newSvgEl, playerNum);
-
+          refresh();
           dragSource = null;
         });
+
+        // Initial build
+        refresh();
       }
 
       // ---- Chord Toolbar: Drag-and-Drop to ADD to Pie Wheel ----
       let dragSource = null;
 
-      // Build initial pie wheels + toolbars
-      buildPieWheel(document.getElementById('p1-pie-wheel'), p1PieQualities);
-      buildPieWheel(document.getElementById('p2-pie-wheel'), p2PieQualities);
-      rebuildToolbar(document.getElementById('p1-chord-toolbar'), p1PieQualities);
-      rebuildToolbar(document.getElementById('p2-chord-toolbar'), p2PieQualities);
-
-      // Attach all event handlers
-      attachPieClickHandlers(document.getElementById('p1-pie-wheel'), 1);
-      attachPieClickHandlers(document.getElementById('p2-pie-wheel'), 2);
-      attachToolbarDragHandlers(
-        document.getElementById('p1-pie-wheel'),
-        document.getElementById('p1-chord-toolbar'),
-        p1PieQualities, 1
-      );
-      attachToolbarDragHandlers(
-        document.getElementById('p2-pie-wheel'),
-        document.getElementById('p2-chord-toolbar'),
-        p2PieQualities, 2
-      );
+      // Setup both player pie wheel systems
+      setupPieSystem('p1-pie-wheel', 'p1-chord-toolbar', p1PieQualities, 1);
+      setupPieSystem('p2-pie-wheel', 'p2-chord-toolbar', p2PieQualities, 2);
 
       // Filters
       const hp = document.getElementById('hp-filter');
