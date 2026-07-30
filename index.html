@@ -798,11 +798,14 @@
       position: fixed; inset: 0; z-index: 9999;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      background: #0a0a0f;
+      background: rgba(5,5,12,0.96);
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      cursor: pointer;
       transition: opacity 0.8s ease, visibility 0.8s ease;
+      user-select: none;
     }
     #loading-screen.fade-out {
-      opacity: 0; visibility: hidden;
+      opacity: 0; visibility: hidden; pointer-events: none;
     }
     .loading-icon {
       font-size: 56px;
@@ -3616,6 +3619,15 @@
     // 8. MEDIAPIPE ONRESULTS MAIN LOOP
     // ===================================================================
     function onResults(results) {
+      // Dismiss loading screen on first frame
+      if (!window._firstFrameReceived) {
+        window._firstFrameReceived = true;
+        const ls = document.getElementById('loading-screen');
+        if (ls) { ls.classList.add('fade-out'); setTimeout(() => ls.remove(), 900); }
+        const so = document.getElementById('start-overlay');
+        if (so) { so.classList.add('hidden'); }
+      }
+
       const now = performance.now();
 
       // FPS Calculation
@@ -4414,16 +4426,17 @@
       btnDuo?.addEventListener('click', () => switchMode('duo'));
       btnSoloAccomp?.addEventListener('click', () => switchMode('solo_accomp'));
 
-      // Show Tap to Begin immediately to prevent Web Audio / decoding deadlocks
-      const sub = document.querySelector('.overlay-subtitle');
-      if (sub) sub.textContent = 'Tap anywhere to begin';
-
-      // Dismiss loading screen now that UI is ready
-      const loadingScreen = document.getElementById('loading-screen');
-      if (loadingScreen) {
-        loadingScreen.classList.add('fade-out');
-        setTimeout(() => loadingScreen.remove(), 900);
+      // Show Tap to Begin on loading screen once scripts are ready
+      const loadingSubEl = document.querySelector('.loading-subtitle');
+      if (loadingSubEl) {
+        loadingSubEl.textContent = 'Tap anywhere to begin';
+        loadingSubEl.style.animation = 'pulse 2.5s ease-in-out infinite';
       }
+      // Hide the old start-overlay (loading screen replaces it)
+      const oldOverlay = document.getElementById('start-overlay');
+      if (oldOverlay) oldOverlay.style.display = 'none';
+
+      // Loading screen stays visible until first camera frame arrives
 
       // Load samples in the background
       Tone.loaded().then(() => {
@@ -4434,11 +4447,16 @@
         samplersLoaded = true; // Fallback
       });
 
-      const overlay = document.getElementById('start-overlay');
+      const loadingScreen = document.getElementById('loading-screen');
       const begin = async () => {
         if (audioStarted) return;
         audioStarted = true;
-        overlay.classList.add('hidden');
+
+        // Update loading screen text while camera starts
+        if (loadingSubEl) {
+          loadingSubEl.textContent = 'Starting camera...';
+          loadingSubEl.style.animation = 'none';
+        }
 
         try {
           await Tone.start();
@@ -4454,8 +4472,8 @@
         }
       };
 
-      overlay.addEventListener('click', begin);
-      overlay.addEventListener('touchstart', begin, { passive: true });
+      loadingScreen.addEventListener('click', begin);
+      loadingScreen.addEventListener('touchstart', begin, { passive: true });
     })();
   </script>
 </body>
