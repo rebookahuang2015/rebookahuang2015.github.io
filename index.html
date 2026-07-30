@@ -793,6 +793,52 @@
       .chord-label.p2 { right: 20px; }
       #sound-controls { width: 340px; display: none; } /* hide sound controls on small screens for visual layout */
     }
+    /* ---- Loading Screen ---- */
+    #loading-screen {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #0a0a0f;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+    #loading-screen.fade-out {
+      opacity: 0; visibility: hidden;
+    }
+    .loading-icon {
+      font-size: 56px;
+      animation: loadingBounce 1.6s ease-in-out infinite;
+      margin-bottom: 28px;
+      filter: drop-shadow(0 0 20px rgba(210,180,140,0.4));
+    }
+    .loading-title {
+      font-size: 28px; font-weight: 700; letter-spacing: -0.5px;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #fff, rgba(210,180,140,0.9));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .loading-subtitle {
+      font-size: 12px; font-weight: 300; color: rgba(255,255,255,0.35);
+      letter-spacing: 3px; text-transform: uppercase; margin-bottom: 32px;
+    }
+    .loading-bar-track {
+      width: 180px; height: 3px; border-radius: 3px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    .loading-bar-fill {
+      width: 30%; height: 100%; border-radius: 3px;
+      background: linear-gradient(90deg, rgba(210,180,140,0.6), rgba(210,180,140,0.9));
+      animation: loadingSlide 1.4s ease-in-out infinite;
+    }
+    @keyframes loadingBounce {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-12px) scale(1.05); }
+    }
+    @keyframes loadingSlide {
+      0% { transform: translateX(-100%); width: 30%; }
+      50% { width: 60%; }
+      100% { transform: translateX(500%); width: 30%; }
+    }
   </style>
 
   <!-- MediaPipe dependencies (local libs with CDN fallback) -->
@@ -802,6 +848,16 @@
   <script src="libs/Tone.js"></script>
 </head>
 <body>
+  <!-- Loading Screen (shows immediately while scripts parse) -->
+  <div id="loading-screen">
+    <div class="loading-icon">🎶</div>
+    <div class="loading-title">Gesture Symphony</div>
+    <div class="loading-subtitle">Loading</div>
+    <div class="loading-bar-track">
+      <div class="loading-bar-fill"></div>
+    </div>
+  </div>
+
   <video id="webcam" playsinline></video>
   <!-- Player 1 Control Panels -->
   <div id="p1-left-panel" class="left-panel p1">
@@ -4361,6 +4417,13 @@
       // Show Tap to Begin immediately to prevent Web Audio / decoding deadlocks
       const sub = document.querySelector('.overlay-subtitle');
       if (sub) sub.textContent = 'Tap anywhere to begin';
+
+      // Dismiss loading screen now that UI is ready
+      const loadingScreen = document.getElementById('loading-screen');
+      if (loadingScreen) {
+        loadingScreen.classList.add('fade-out');
+        setTimeout(() => loadingScreen.remove(), 900);
+      }
 
       // Load samples in the background
       Tone.loaded().then(() => {
