@@ -825,28 +825,7 @@
       <svg id="p1-pie-wheel" class="pie-wheel-svg" viewBox="0 0 340 340"></svg>
     </div>
     <div class="chord-toolbar" id="p1-chord-toolbar">
-      <div class="toolbar-label">Drag to add</div>
-      <div class="toolbar-chip" draggable="true" data-quality="Maj7">
-        <span class="chip-emoji">🌙</span><span class="chip-label">Maj 7</span>
-      </div>
-      <div class="toolbar-chip" draggable="true" data-quality="Sus2">
-        <span class="chip-emoji">🫧</span><span class="chip-label">Sus 2</span>
-      </div>
-      <div class="toolbar-chip" draggable="true" data-quality="Sus4">
-        <span class="chip-emoji">⏳</span><span class="chip-label">Sus 4</span>
-      </div>
-      <div class="toolbar-chip" draggable="true" data-quality="Min7">
-        <span class="chip-emoji">🌊</span><span class="chip-label">Min 7</span>
-      </div>
-      <div class="toolbar-chip" draggable="true" data-quality="Min6">
-        <span class="chip-emoji">🌅</span><span class="chip-label">Min 6</span>
-      </div>
-      <div class="toolbar-chip" draggable="true" data-quality="Min7b5">
-        <span class="chip-emoji">🕯️</span><span class="chip-label">m7♭5</span>
-      </div>
-      <div class="toolbar-chip" draggable="true" data-quality="Maj6">
-        <span class="chip-emoji">🍂</span><span class="chip-label">Maj 6</span>
-      </div>
+      <!-- dynamically generated -->
     </div>
   </div>
 
@@ -872,28 +851,7 @@
       <svg id="p2-pie-wheel" class="pie-wheel-svg" viewBox="0 0 340 340"></svg>
     </div>
     <div class="chord-toolbar" id="p2-chord-toolbar">
-      <div class="toolbar-label">Drag to add</div>
-      <div class="toolbar-chip" draggable="true" data-quality="Maj7">
-        <span class="chip-emoji">🌙</span><span class="chip-label">Maj 7</span>
-      </div>
-      <div class="toolbar-chip" draggable="true" data-quality="Sus2">
-        <span class="chip-emoji">🫧</span><span class="chip-label">Sus 2</span>
-      </div>
-      <div class="toolbar-chip" draggable="true" data-quality="Sus4">
-        <span class="chip-emoji">⏳</span><span class="chip-label">Sus 4</span>
-      </div>
-      <div class="toolbar-chip" draggable="true" data-quality="Min7">
-        <span class="chip-emoji">🌊</span><span class="chip-label">Min 7</span>
-      </div>
-      <div class="toolbar-chip" draggable="true" data-quality="Min6">
-        <span class="chip-emoji">🌅</span><span class="chip-label">Min 6</span>
-      </div>
-      <div class="toolbar-chip" draggable="true" data-quality="Min7b5">
-        <span class="chip-emoji">🕯️</span><span class="chip-label">m7♭5</span>
-      </div>
-      <div class="toolbar-chip" draggable="true" data-quality="Maj6">
-        <span class="chip-emoji">🍂</span><span class="chip-label">Maj 6</span>
-      </div>
+      <!-- dynamically generated -->
     </div>
   </div>
 
@@ -4051,139 +4009,171 @@
       }
 
       // Default 4 qualities for each player's pie wheel
+      const ALL_QUALITIES = ['Major', 'Dom7', 'Minor', 'Dim', 'Maj7', 'Min7', 'Sus4', 'Sus2', 'Min6', 'Min7b5', 'Maj6'];
       const DEFAULT_PIE_QUALITIES = ['Major', 'Dom7', 'Minor', 'Dim'];
       const p1PieQualities = [...DEFAULT_PIE_QUALITIES];
       const p2PieQualities = [...DEFAULT_PIE_QUALITIES];
 
-      // Build initial pie wheels
-      buildPieWheel(document.getElementById('p1-pie-wheel'), p1PieQualities);
-      buildPieWheel(document.getElementById('p2-pie-wheel'), p2PieQualities);
+      // Dynamic toolbar: shows only qualities NOT in the pie
+      function rebuildToolbar(toolbarEl, pieQualities) {
+        const remaining = ALL_QUALITIES.filter(q => !pieQualities.includes(q));
+        let html = '<div class="toolbar-label">Drag to add</div>';
+        for (const q of remaining) {
+          const meta = QUALITY_META[q];
+          html += `<div class="toolbar-chip" draggable="true" data-quality="${q}">`;
+          html += `<span class="chip-emoji">${meta.emoji}</span><span class="chip-label">${meta.label}</span>`;
+          html += `</div>`;
+        }
+        if (remaining.length === 0) {
+          html = '<div class="toolbar-label">All chord types added</div>';
+        }
+        toolbarEl.innerHTML = html;
+      }
 
-      // Pie segment click selection
-      document.querySelectorAll('.pie-segment-group').forEach(seg => {
-        seg.addEventListener('click', () => {
-          const q = seg.dataset.quality;
-          if (q) {
-            p1StableQuality = q;
-            p1LastRawQuality = q;
-            p1QualitySince = performance.now();
-          }
+      // Attach click handlers for pie segments (click to select quality)
+      function attachPieClickHandlers(svgEl, playerNum) {
+        svgEl.querySelectorAll('.pie-segment-group').forEach(seg => {
+          seg.addEventListener('click', () => {
+            const q = seg.dataset.quality;
+            if (!q) return;
+            if (playerNum === 1) {
+              p1StableQuality = q;
+              p1LastRawQuality = q;
+              p1QualitySince = performance.now();
+            } else {
+              p2StableQuality = q;
+              p2LastRawQuality = q;
+              p2QualitySince = performance.now();
+            }
+          });
         });
-      });
+      }
 
-      // ---- Chord Toolbar: Drag-and-Drop onto Pie Wheel ----
-      let dragSource = null;
+      // Full rebuild: pie + toolbar + event listeners
+      function fullRebuild(svgEl, toolbarEl, pieQualities, playerNum) {
+        buildPieWheel(svgEl, pieQualities);
+        rebuildToolbar(toolbarEl, pieQualities);
+        attachPieClickHandlers(svgEl, playerNum);
+        attachPieRemoveHandlers(svgEl, toolbarEl, pieQualities, playerNum);
+        attachToolbarDragHandlers(svgEl, toolbarEl, pieQualities, playerNum);
+      }
 
-      function initPieToolbarDnD(wheelId, toolbarId, pieQualities) {
-        const svgEl = document.getElementById(wheelId);
-        const toolbar = document.getElementById(toolbarId);
-        const wrapper = svgEl?.closest('.pie-wheel-wrapper');
-        if (!svgEl || !toolbar || !wrapper) return;
+      // Right-click pie segment to remove it back to toolbar
+      function attachPieRemoveHandlers(svgEl, toolbarEl, pieQualities, playerNum) {
+        svgEl.querySelectorAll('.pie-segment-group').forEach(seg => {
+          seg.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (pieQualities.length <= 1) return; // must keep at least 1
+            const q = seg.dataset.quality;
+            const idx = pieQualities.indexOf(q);
+            if (idx >= 0) {
+              pieQualities.splice(idx, 1);
+              fullRebuild(svgEl, toolbarEl, pieQualities, playerNum);
+            }
+          });
+        });
+      }
 
-        const toolbarChips = toolbar.querySelectorAll('.toolbar-chip');
+      // Attach drag handlers to toolbar chips (re-called after toolbar rebuild)
+      function attachToolbarDragHandlers(svgEl, toolbarEl, pieQualities, playerNum) {
+        const wrapper = svgEl.closest('.pie-wheel-wrapper');
+        if (!wrapper) return;
 
-        // Toolbar chip drag start
-        toolbarChips.forEach(chip => {
+        toolbarEl.querySelectorAll('.toolbar-chip').forEach(chip => {
           chip.addEventListener('dragstart', (e) => {
             dragSource = { element: chip, type: 'chip', quality: chip.dataset.quality };
             chip.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.effectAllowed = 'copy';
             e.dataTransfer.setData('text/plain', chip.dataset.quality);
           });
           chip.addEventListener('dragend', () => {
             chip.classList.remove('dragging');
             svgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-            toolbar.classList.remove('drag-over');
             dragSource = null;
           });
         });
 
-        // Pie wheel wrapper as drop target
-        wrapper.addEventListener('dragover', (e) => {
-          if (!dragSource || dragSource.type !== 'chip') return;
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
+        // Remove old listeners by cloning wrapper (prevents stacking)
+        const newWrapper = wrapper.cloneNode(true);
+        wrapper.parentNode.replaceChild(newWrapper, wrapper);
+        // Re-query svgEl from the new wrapper
+        const newSvgEl = newWrapper.querySelector('.pie-wheel-svg');
 
-          // Highlight the segment under pointer using angle
-          const rect = svgEl.getBoundingClientRect();
-          const cx = rect.left + rect.width / 2;
-          const cy = rect.top + rect.height / 2;
-          let angle = Math.atan2(e.clientX - cx, -(e.clientY - cy)) * 180 / Math.PI;
-          if (angle < 0) angle += 360;
-          const segArc = 360 / pieQualities.length;
-          const idx = Math.floor(angle / segArc);
-
-          svgEl.querySelectorAll('.pie-segment-group').forEach((seg, i) => {
-            seg.classList.toggle('drag-over', i === idx);
+        // Re-attach click + right-click on the cloned SVG
+        attachPieClickHandlers(newSvgEl, playerNum);
+        newSvgEl.querySelectorAll('.pie-segment-group').forEach(seg => {
+          seg.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (pieQualities.length <= 1) return;
+            const q = seg.dataset.quality;
+            const idx = pieQualities.indexOf(q);
+            if (idx >= 0) {
+              pieQualities.splice(idx, 1);
+              buildPieWheel(newSvgEl, pieQualities);
+              rebuildToolbar(toolbarEl, pieQualities);
+              attachToolbarDragHandlers(newSvgEl, toolbarEl, pieQualities, playerNum);
+              attachPieClickHandlers(newSvgEl, playerNum);
+            }
           });
         });
 
-        wrapper.addEventListener('dragleave', (e) => {
-          if (!wrapper.contains(e.relatedTarget)) {
-            svgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        // Pie wheel as drop target — ADD (not swap)
+        newWrapper.addEventListener('dragover', (e) => {
+          if (!dragSource || dragSource.type !== 'chip') return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          // Glow the whole wheel
+          newSvgEl.querySelectorAll('.pie-segment-group').forEach(seg => seg.classList.add('drag-over'));
+        });
+
+        newWrapper.addEventListener('dragleave', (e) => {
+          if (!newWrapper.contains(e.relatedTarget)) {
+            newSvgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
           }
         });
 
-        wrapper.addEventListener('drop', (e) => {
+        newWrapper.addEventListener('drop', (e) => {
           e.preventDefault();
-          svgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+          newSvgEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
           if (!dragSource || dragSource.type !== 'chip') return;
 
           const incoming = dragSource.quality;
-          // Find which segment was targeted by angle
-          const rect = svgEl.getBoundingClientRect();
-          const cx = rect.left + rect.width / 2;
-          const cy = rect.top + rect.height / 2;
-          let angle = Math.atan2(e.clientX - cx, -(e.clientY - cy)) * 180 / Math.PI;
-          if (angle < 0) angle += 360;
-          const segArc = 360 / pieQualities.length;
-          const idx = Math.floor(angle / segArc);
-          if (idx < 0 || idx >= pieQualities.length) return;
+          if (pieQualities.includes(incoming)) return; // already in pie
+          if (pieQualities.length >= 11) return; // max
 
-          const outgoing = pieQualities[idx];
-          if (incoming === outgoing) return;
-
-          // Swap: put incoming in pie, put outgoing back in toolbar chip
-          pieQualities[idx] = incoming;
-          const outMeta = QUALITY_META[outgoing];
-          dragSource.element.dataset.quality = outgoing;
-          dragSource.element.querySelector('.chip-emoji').textContent = outMeta.emoji;
-          dragSource.element.querySelector('.chip-label').textContent = outMeta.label;
-
-          // Rebuild pie wheel
-          buildPieWheel(svgEl, pieQualities);
-          // Re-attach click handlers
-          svgEl.querySelectorAll('.pie-segment-group').forEach(seg => {
-            seg.addEventListener('click', () => {
-              const q = seg.dataset.quality;
-              if (q) {
-                p1StableQuality = q;
-                p1LastRawQuality = q;
-                p1QualitySince = performance.now();
-              }
-            });
-          });
+          // ADD to pie
+          pieQualities.push(incoming);
+          buildPieWheel(newSvgEl, pieQualities);
+          rebuildToolbar(toolbarEl, pieQualities);
+          attachToolbarDragHandlers(newSvgEl, toolbarEl, pieQualities, playerNum);
+          attachPieClickHandlers(newSvgEl, playerNum);
 
           dragSource = null;
         });
-
-        // Toolbar as drop target (not used for now, kept for future)
-        toolbar.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          toolbar.classList.add('drag-over');
-        });
-        toolbar.addEventListener('dragleave', () => {
-          toolbar.classList.remove('drag-over');
-        });
-        toolbar.addEventListener('drop', (e) => {
-          e.preventDefault();
-          toolbar.classList.remove('drag-over');
-        });
       }
 
-      // Initialize drag-and-drop for both player panels
-      initPieToolbarDnD('p1-pie-wheel', 'p1-chord-toolbar', p1PieQualities);
-      initPieToolbarDnD('p2-pie-wheel', 'p2-chord-toolbar', p2PieQualities);
+      // ---- Chord Toolbar: Drag-and-Drop to ADD to Pie Wheel ----
+      let dragSource = null;
+
+      // Build initial pie wheels + toolbars
+      buildPieWheel(document.getElementById('p1-pie-wheel'), p1PieQualities);
+      buildPieWheel(document.getElementById('p2-pie-wheel'), p2PieQualities);
+      rebuildToolbar(document.getElementById('p1-chord-toolbar'), p1PieQualities);
+      rebuildToolbar(document.getElementById('p2-chord-toolbar'), p2PieQualities);
+
+      // Attach all event handlers
+      attachPieClickHandlers(document.getElementById('p1-pie-wheel'), 1);
+      attachPieClickHandlers(document.getElementById('p2-pie-wheel'), 2);
+      attachToolbarDragHandlers(
+        document.getElementById('p1-pie-wheel'),
+        document.getElementById('p1-chord-toolbar'),
+        p1PieQualities, 1
+      );
+      attachToolbarDragHandlers(
+        document.getElementById('p2-pie-wheel'),
+        document.getElementById('p2-chord-toolbar'),
+        p2PieQualities, 2
+      );
 
       // Filters
       const hp = document.getElementById('hp-filter');
