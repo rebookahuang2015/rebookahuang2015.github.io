@@ -1313,8 +1313,18 @@
     function scrX(x) { return (1 - x) * canvas.width; }
     function scrY(y) { return y * canvas.height; }
 
+    // Guard: ensure all 21 landmarks are defined with x/y coords
+    function isValidHand(lm) {
+      if (!lm || lm.length < 21) return false;
+      for (let i = 0; i < 21; i++) {
+        if (!lm[i] || lm[i].x === undefined || lm[i].y === undefined) return false;
+      }
+      return true;
+    }
+
     function fingerExtended(lm, tip, pip) {
       const w = lm[LM.WRIST];
+      if (!w || !lm[tip] || !lm[pip]) return false;
       const dTip = Math.hypot(lm[tip].x - w.x, lm[tip].y - w.y);
       const dPip = Math.hypot(lm[pip].x - w.x, lm[pip].y - w.y);
       return dTip > dPip * 1.05;
@@ -1324,6 +1334,7 @@
 
     function thumbOut(lm, label) {
       const tip = lm[LM.THUMB_TIP], ip = lm[LM.THUMB_IP];
+      if (!tip || !ip) return false;
       return label === 'Left' ? (tip.x > ip.x + 0.015) : (tip.x < ip.x - 0.015);
     }
 
@@ -1375,6 +1386,7 @@
 
     function fingerExtended(lm, tip, pip) {
       const w = lm[LM.WRIST];
+      if (!w || !lm[tip] || !lm[pip]) return false;
       const dTip = Math.hypot(lm[tip].x - w.x, lm[tip].y - w.y);
       const dPip = Math.hypot(lm[pip].x - w.x, lm[pip].y - w.y);
       return dTip > dPip * 1.05;
@@ -1386,6 +1398,7 @@
 
     function thumbOut(lm, label) {
       const tip = lm[LM.THUMB_TIP], ip = lm[LM.THUMB_IP];
+      if (!tip || !ip) return false;
       return label === 'Left' ? (tip.x > ip.x + 0.015) : (tip.x < ip.x - 0.015);
     }
 
@@ -1949,6 +1962,7 @@
     }
 
     function drawSkeleton(lm, playerColor) {
+      if (!isValidHand(lm)) return;
       const isP1 = playerColor === '#00ff88';
       const glowColor = isP1 ? 'rgba(0,255,136,0.25)' : 'rgba(255,110,199,0.25)';
       // Batch all bone lines in one path
@@ -1957,6 +1971,7 @@
       ctx.lineCap = 'round';
       ctx.beginPath();
       for (const [a, b] of BONES) {
+        if (!lm[a] || !lm[b]) continue;
         ctx.moveTo(scrX(lm[a].x), scrY(lm[a].y));
         ctx.lineTo(scrX(lm[b].x), scrY(lm[b].y));
       }
@@ -1965,6 +1980,7 @@
       ctx.fillStyle = glowColor;
       ctx.beginPath();
       for (let i = 0; i < 21; i++) {
+        if (!lm[i]) continue;
         const px = scrX(lm[i].x), py = scrY(lm[i].y);
         const r = (i===4||i===8||i===12||i===16||i===20) ? 12 : 7;
         ctx.moveTo(px + r, py);
@@ -1975,6 +1991,7 @@
       ctx.fillStyle = playerColor;
       ctx.beginPath();
       for (let i = 0; i < 21; i++) {
+        if (!lm[i]) continue;
         const px = scrX(lm[i].x), py = scrY(lm[i].y);
         const r = (i===4||i===8||i===12||i===16||i===20) ? 5 : 3;
         ctx.moveTo(px + r, py);
@@ -3265,6 +3282,7 @@
       calcBoundingBoxArea(landmarks) {
         let minX = 1, maxX = 0, minY = 1, maxY = 0;
         for (const lm of landmarks) {
+          if (!lm || lm.x === undefined) continue;
           if (lm.x < minX) minX = lm.x;
           if (lm.x > maxX) maxX = lm.x;
           if (lm.y < minY) minY = lm.y;
@@ -3589,8 +3607,9 @@
         const activeScaleNotes = [];
         const displayPitches = [];
 
-        // Process each detected hand
+        // Process each detected hand — skip any with malformed/partial landmarks
         for (let h = 0; h < hands.length; h++) {
+          if (!isValidHand(hands[h])) continue;
           const pitch = this.processOneHand(hands[h], h, ctx, now, activeScaleNotes);
           if (pitch) displayPitches.push(pitch.replace(/\d+$/, ''));
         }
@@ -3774,6 +3793,7 @@
 
       for (let i = 0; i < p1Hands.length; i++) {
         const lm = p1Hands[i];
+        if (!isValidHand(lm)) continue;
         const info = p1Handedness[i];
         if (info.label === 'Right') {
           rawRootP1 = detectLeftGesture(lm, 'Left');
@@ -3810,6 +3830,7 @@
       if (playMode === 'duo') {
         for (let i = 0; i < p2Hands.length; i++) {
           const lm = p2Hands[i];
+          if (!isValidHand(lm)) continue;
           const info = p2Handedness[i];
           if (info.label === 'Right') {
             rawRootP2 = detectLeftGesture(lm, 'Left');
