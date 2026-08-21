@@ -4034,15 +4034,15 @@
       }
 
       // Launch tutorial on first frame if not yet completed
-      if (window._firstFrameReceived && !window._tutorialChecked && window._tutSystemReady) {
+      if (window._firstFrameReceived && !window._tutorialChecked && window.TutorialSystem) {
         window._tutorialChecked = true;
         if (!localStorage.getItem('tut_single')) {
-          setTimeout(() => TutorialSystem.start('single'), 1200);
+          setTimeout(() => window.TutorialSystem.start('single'), 1200);
         }
       }
 
       // Feed gesture data to tutorial
-      if (window._tutSystemReady) TutorialSystem.checkGesture(results);
+      if (window.TutorialSystem) window.TutorialSystem.checkGesture(results);
 
       const now = performance.now();
 
@@ -4903,7 +4903,7 @@
       // ===================================================================
       // TUTORIAL SYSTEM
       // ===================================================================
-      var TutorialSystem = {
+      window.TutorialSystem = {
         overlay: null, textEl: null, nextBtn: null, skipBtn: null,
         progressFill: null, detectedEl: null, hintEl: null, mascotEl: null,
         currentFlow: null, currentStep: 0, totalSteps: 0,
@@ -5121,8 +5121,8 @@
 
         isActive() { return this.overlay && this.overlay.classList.contains('tut-active'); }
       };
-      TutorialSystem.init();
-      window._tutSystemReady = true;
+      window.TutorialSystem.init();
+
 
       const switchMode = (mode) => {
         // Deactivate solo_accomp if leaving it
@@ -5168,7 +5168,7 @@
           SoloAccompMode.activate();
           // Launch solo tutorial if not yet completed
           if (!localStorage.getItem('tut_solo')) {
-            setTimeout(() => TutorialSystem.start('solo'), 600);
+            setTimeout(() => window.TutorialSystem.start('solo'), 600);
           }
         }
       };
