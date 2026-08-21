@@ -4916,7 +4916,7 @@
               hint: '\ud83c\udfb5', hintLabel: '', btn: 'Let\'s go! \u2192'
             },
             {
-              text: 'Your <strong>right hand</strong> picks the root note!<br>Try making a <strong>\u270c\ufe0f peace sign</strong> to play <strong style="color:#00ff88">D</strong>.',
+              text: 'Your <strong>left hand</strong> picks the root note!<br>Try making a <strong>\u270c\ufe0f peace sign</strong> to play <strong style="color:#00ff88">D</strong>.',
               hint: '\u270c\ufe0f', hintLabel: 'Show a peace sign',
               validate: (results) => {
                 if (!results.multiHandLandmarks) return false;
@@ -4930,7 +4930,7 @@
               }
             },
             {
-              text: 'Your <strong>left hand</strong> points at the <strong style="color:#e2c87e">chord wheel</strong> to pick a chord type!<br>Try pointing at any segment.',
+              text: 'Your <strong>right hand</strong> points at the <strong style="color:#e2c87e">chord wheel</strong> to pick a chord type!<br>Try pointing at any segment.',
               hint: '\ud83d\udc46', hintLabel: 'Point at the wheel',
               validate: (results) => {
                 if (!results.multiHandLandmarks) return false;
@@ -5069,6 +5069,12 @@
           this.progressFill.style.width = ((n + 1) / this.totalSteps * 100) + '%';
           this.textEl.innerHTML = step.text;
           this.nextBtn.textContent = step.btn || 'Next \u2192';
+          // Hide the Next button on gesture-detection steps until detected
+          if (step.validate) {
+            this.nextBtn.style.display = 'none';
+          } else {
+            this.nextBtn.style.display = '';
+          }
           if (step.hint) {
             this.hintEl.innerHTML = '<div class="tut-hint-emoji">' + step.hint + '</div>' +
               (step.hintLabel ? '<div class="tut-hint-label">' + step.hintLabel + '</div>' : '');
@@ -5078,6 +5084,7 @@
           }
           this.detectedEl.classList.remove('tut-show');
           this.mascotEl.classList.remove('tut-excited');
+          this._gestureConfirmed = false;
           const guide = this.overlay.querySelector('.tut-guide');
           if (guide) { guide.style.animation = 'none'; guide.offsetHeight; guide.style.animation = ''; }
           this.gestureHoldStart = 0;
@@ -5109,10 +5116,13 @@
           if (!step || !step.validate || this.advancing) return;
           if (step.validate(results)) {
             if (this.gestureHoldStart === 0) this.gestureHoldStart = performance.now();
-            if (performance.now() - this.gestureHoldStart >= this.gestureDebounce) {
+            if (performance.now() - this.gestureHoldStart >= this.gestureDebounce && !this._gestureConfirmed) {
+              this._gestureConfirmed = true;
               this.detectedEl.classList.add('tut-show');
               this.mascotEl.classList.add('tut-excited');
-              setTimeout(() => { this.detectedEl.classList.remove('tut-show'); this.advance(); }, 800);
+              this.textEl.innerHTML = '\u2705 <strong>Nice one!</strong> You\'re getting the hang of it!';
+              this.nextBtn.textContent = 'Awesome! \u2192';
+              this.nextBtn.style.display = '';
             }
           } else {
             this.gestureHoldStart = 0;
