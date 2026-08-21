@@ -4033,12 +4033,10 @@
         if (so) { so.classList.add('hidden'); }
       }
 
-      // Launch tutorial on first frame if not yet completed
+      // Launch tutorial on first frame
       if (window._firstFrameReceived && !window._tutorialChecked && window.TutorialSystem) {
         window._tutorialChecked = true;
-        if (!localStorage.getItem('tut_single')) {
-          setTimeout(() => window.TutorialSystem.start('single'), 1200);
-        }
+        setTimeout(() => window.TutorialSystem.start('single'), 1200);
       }
 
       // Feed gesture data to tutorial
@@ -5101,8 +5099,6 @@
         finish() {
           if (!this.overlay) return;
           this.overlay.classList.remove('tut-active');
-          if (this.currentFlow === 'single') localStorage.setItem('tut_single', 'done');
-          else if (this.currentFlow === 'solo') localStorage.setItem('tut_solo', 'done');
           this.currentFlow = null;
         },
 
@@ -5163,6 +5159,9 @@
           currentTabPlayer = 1;
           updateSoundControlsUI();
           ChordGlyphRenderer.clear();
+          if (window.TutorialSystem) {
+            setTimeout(() => window.TutorialSystem.start('single'), 400);
+          }
         } else if (mode === 'duo') {
           btnDuo?.classList.add('active');
           document.body.classList.add('mode-duo');
@@ -5176,9 +5175,8 @@
           currentTabPlayer = 1;
           ChordGlyphRenderer.clear();
           SoloAccompMode.activate();
-          // Launch solo tutorial if not yet completed
-          if (!localStorage.getItem('tut_solo')) {
-            setTimeout(() => window.TutorialSystem.start('solo'), 600);
+          if (window.TutorialSystem) {
+            setTimeout(() => window.TutorialSystem.start('solo'), 400);
           }
         }
       };
