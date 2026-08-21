@@ -1,0 +1,183 @@
+@import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Pinyon+Script&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&family=Instrument+Sans:wght@300;400;500&display=swap');
+@import 'tailwindcss';
+
+@theme inline {
+  --font-display: 'Marcellus', 'Cormorant Garamond', Georgia, serif;
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-script: 'Pinyon Script', 'Cormorant Garamond', cursive;
+  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+
+  --color-gold: #c9a84c;
+  --color-gold-light: #e2c87e;
+  --color-gold-dim: #7a6330;
+  --color-obsidian: #0a0a0b;
+  --color-surface: #111114;
+  --color-surface-raised: #18181c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #0a0a0b;
+  color: #e8e2d9;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes float-up {
+  0%   { transform: translateY(0px) rotate(var(--rot, 0deg)); opacity: 0.15; }
+  50%  { opacity: 0.35; }
+  100% { transform: translateY(-60px) rotate(var(--rot, 0deg)); opacity: 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes line-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+.note-float {
+  animation: float-up 4s ease-in-out infinite;
+}
+
+.glow-pulse {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.fade-in-up {
+  animation: fade-in-up 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    #c9a84c 0%,
+    #e2c87e 30%,
+    #f5e4b0 50%,
+    #e2c87e 70%,
+    #c9a84c 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 4s linear infinite;
+}
+
+@keyframes trail-fade {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4) rotate(var(--rot, 0deg)); }
+  18%  { opacity: 0.95; transform: translate(-50%, -50%) scale(1.05) rotate(var(--rot, 0deg)); }
+  100% { opacity: 0; transform: translate(-50%, -90%) scale(0.7) rotate(var(--rot, 0deg)); }
+}
+
+.trail-note {
+  animation: trail-fade 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  filter: drop-shadow(0 0 6px rgba(226, 200, 126, 0.7));
+  will-change: transform, opacity;
+}
+
+.title-glow {
+  filter: drop-shadow(0 0 18px rgba(226, 200, 126, 0.45))
+          drop-shadow(0 0 42px rgba(201, 168, 76, 0.28));
+}
+
+@keyframes glow-breathe {
+  0%, 100% { filter: drop-shadow(0 0 16px rgba(226, 200, 126, 0.35)) drop-shadow(0 0 40px rgba(201, 168, 76, 0.22)); }
+  50%       { filter: drop-shadow(0 0 26px rgba(226, 200, 126, 0.6)) drop-shadow(0 0 64px rgba(201, 168, 76, 0.4)); }
+}
+
+.title-glow {
+  animation: glow-breathe 4.5s ease-in-out infinite;
+}
+
+.line-reveal {
+  transform-origin: left center;
+  animation: line-grow 1.5s cubic-bezier(0.16, 1, 0.3, 1) 1.4s both;
+}
+
+/* Idle "breath" — a slow suspended drift for the title */
+@keyframes title-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+.title-float {
+  animation: title-float 6s ease-in-out infinite;
+}
+
+/* Inner layer carries the cursor parallax; eases rather than snaps */
+.title-parallax {
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* Springy lift + glow bloom when the cursor is near the title */
+.title-lift {
+  transition:
+    transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.55s ease;
+}
+
+.title-lift--active {
+  transform: translateY(-10px) scale(1.03);
+}
+
+.title-glow--active {
+  filter: drop-shadow(0 0 30px rgba(226, 200, 126, 0.7))
+          drop-shadow(0 0 72px rgba(201, 168, 76, 0.5)) !important;
+}
+
+/* Soft gold ripple radiating from a tap */
+@keyframes ripple-out {
+  0%   { opacity: 0.55; transform: translate(-50%, -50%) scale(0); }
+  100% { opacity: 0;    transform: translate(-50%, -50%) scale(1); }
+}
+
+.ripple {
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  border-radius: 9999px;
+  border: 1px solid rgba(226, 200, 126, 0.8);
+  box-shadow: 0 0 18px rgba(226, 200, 126, 0.35);
+  animation: ripple-out 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-float,
+  .glow-pulse,
+  .note-float,
+  .shimmer-text {
+    animation: none !important;
+  }
+  .title-parallax {
+    transform: none !important;
+  }
+}
+
+::-webkit-scrollbar { display: none; }

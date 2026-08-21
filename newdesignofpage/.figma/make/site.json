@@ -1,0 +1,10 @@
+{
+  "description": "Enhance your project's front page with stylish design elements and classy aesthetics, tailored for users seeking a polished online presence.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
