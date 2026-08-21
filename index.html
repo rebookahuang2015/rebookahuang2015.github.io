@@ -846,7 +846,10 @@
       transition: transform 0.5s cubic-bezier(0.22,1,0.36,1);
       transform-style: preserve-3d; will-change: transform;
     }
-    .landing-title { text-align: center; line-height: 1; }
+    .landing-title {
+      text-align: center; line-height: 1;
+      animation: lnGlowBreathe 4.5s ease-in-out infinite;
+    }
     .landing-title-top {
       display: block;
       font-family: 'Marcellus', Georgia, serif;
@@ -865,7 +868,6 @@
       font-size: clamp(4rem, 14vw, 9rem);
       font-weight: 400; line-height: 0.95; color: #f3e6bb; margin-top: 0.08em;
     }
-    .landing-title-glow { animation: lnGlowBreathe 4.5s ease-in-out infinite; }
     @keyframes lnGlowBreathe {
       0%, 100% { filter: drop-shadow(0 0 16px rgba(226,200,126,0.35)) drop-shadow(0 0 40px rgba(201,168,76,0.22)); }
       50%      { filter: drop-shadow(0 0 26px rgba(226,200,126,0.6)) drop-shadow(0 0 64px rgba(201,168,76,0.4)); }
@@ -1128,8 +1130,8 @@
       <div class="ln-fade landing-title-wrap" style="animation-delay:0.35s;">
         <div class="landing-title-parallax" id="landing-parallax">
           <h1 class="landing-title">
-            <span class="landing-title-top landing-title-glow">Gesture</span>
-            <span class="landing-title-bottom landing-title-glow">Symphony</span>
+            <span class="landing-title-top">Gesture</span>
+            <span class="landing-title-bottom">Symphony</span>
           </h1>
         </div>
       </div>
