@@ -4034,7 +4034,7 @@
       }
 
       // Launch tutorial on first frame if not yet completed
-      if (window._firstFrameReceived && !window._tutorialChecked) {
+      if (window._firstFrameReceived && !window._tutorialChecked && typeof TutorialSystem !== 'undefined') {
         window._tutorialChecked = true;
         TutorialSystem.init();
         if (!localStorage.getItem('tut_single')) {
@@ -4043,7 +4043,7 @@
       }
 
       // Feed gesture data to tutorial
-      TutorialSystem.checkGesture(results);
+      if (typeof TutorialSystem !== 'undefined') TutorialSystem.checkGesture(results);
 
       const now = performance.now();
 
