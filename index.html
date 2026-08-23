@@ -4960,20 +4960,31 @@
             },
             {
               text: 'You can <strong>drag</strong> chord types from the toolbar <strong>into</strong> the wheel, and <strong>drag them back out</strong> to remove! Try customising your palette.',
-              hint: '\u2195\ufe0f', hintLabel: 'Drag chords in & out', btn: 'Got it \u2192'
+              hint: '\u2195\ufe0f', hintLabel: 'Drag chords in & out', btn: 'Got it \u2192',
+              allowInteraction: true
             },
             {
               text: '<strong>\u270b Open palm</strong> = smooth <strong>Glissando</strong> (sliding notes)<br><strong>\ud83d\udc4a Closed fist</strong> = crisp <strong>Legato</strong> (discrete notes)<br>Try switching between them!',
               hint: '\u270b \u2192 \ud83d\udc4a', hintLabel: 'Palm vs Fist', btn: 'Got it \u2192'
             },
             {
-              text: 'You\'re ready to play! \ud83c\udf89<br>Go make something <strong>beautiful</strong>.',
-              hint: '\ud83c\udfb6', hintLabel: '', btn: '\ud83c\udfb5 Let\'s play!', final: true
+              text: 'Nice! Now let\'s explore <strong style="color:#e2c87e">Solo & Accomp</strong> mode \ud83c\udfb6<br>Your hand <strong>becomes</strong> the instrument!',
+              hint: '\ud83c\udfb5', hintLabel: '', btn: 'Let\'s try it! \u2192', final: true,
+              onAdvance: function() {
+                // Auto-switch to solo_accomp mode
+                window._skipSoloTutorialAutoLaunch = true;
+                const btn = document.getElementById('btn-mode-solo-accomp');
+                if (btn) btn.click();
+                setTimeout(() => {
+                  window._skipSoloTutorialAutoLaunch = false;
+                  if (window.TutorialSystem) window.TutorialSystem.start('solo');
+                }, 500);
+              }
             }
           ],
           solo: [
             {
-              text: 'Welcome to <strong>Solo & Accomp</strong> mode! \ud83c\udfb6<br>Here, your hand <strong>IS</strong> the instrument.',
+              text: 'Welcome to <strong style="color:#e2c87e">Solo & Accomp</strong> mode! \ud83c\udfb6<br>Here, your hand <strong>IS</strong> the instrument \u2014 no chord wheel needed!',
               hint: '\ud83c\udfb6', hintLabel: '', btn: 'Show me! \u2192'
             },
             {
@@ -5022,12 +5033,20 @@
               }
             },
             {
-              text: 'Move your hand <strong>up \u2191</strong> for louder, <strong>down \u2193</strong> for softer!<br>Pick a <strong>scale</strong> at the top to change the mood.',
-              hint: '\u2195\ufe0f', hintLabel: 'Height = volume', btn: 'Got it \u2192'
+              text: 'Move your hand <strong>up \u2191</strong> = <strong style="color:#00ff88">louder</strong>, <strong>down \u2193</strong> = <strong style="color:#888">softer</strong>!<br>Your hand height controls the <strong>volume</strong> in real time.',
+              hint: '\u2195\ufe0f', hintLabel: 'Height = Volume', btn: 'Got it \u2192'
             },
             {
-              text: 'You\'re ready! \ud83c\udf89<br>Explore different <strong>scales</strong> \u2014 try <strong>Pentatonic</strong>, <strong>Blues</strong>, or <strong>Chromatic!</strong>',
-              hint: '\ud83c\udfb6', hintLabel: '', btn: '\ud83c\udfb5 Let\'s go!', final: true
+              text: 'Move your hand <strong>closer to the camera</strong> = more <strong style="color:#7eb8e2">reverb</strong> \ud83c\udf0a<br>Move it <strong>further away</strong> = <strong>drier</strong> sound.<br>It\'s like controlling the room size!',
+              hint: '\ud83c\udf0a', hintLabel: 'Depth = Reverb', btn: 'Cool! \u2192'
+            },
+            {
+              text: 'Pick a <strong>scale</strong> at the top to change the mood \u2014 try <strong>Pentatonic</strong>, <strong>Blues</strong>, or <strong>Chromatic!</strong>',
+              hint: '\ud83c\udfbc', hintLabel: 'Scales selector', btn: 'Got it \u2192'
+            },
+            {
+              text: '\u2705 You\'re all set! Go make some <strong>music</strong>! \ud83c\udfb6<br>Have fun exploring all the sounds.',
+              hint: '\ud83c\udf89', hintLabel: '', btn: '\ud83c\udfb5 Let\'s play!', final: true
             }
           ]
         },
@@ -5083,6 +5102,20 @@
           this.detectedEl.classList.remove('tut-show');
           this.mascotEl.classList.remove('tut-excited');
           this._gestureConfirmed = false;
+          // Allow interaction behind overlay for certain steps (e.g. drag chords)
+          const backdrop = this.overlay.querySelector('.tut-backdrop');
+          if (backdrop) {
+            backdrop.style.pointerEvents = step.allowInteraction ? 'none' : '';
+          }
+          if (step.allowInteraction) {
+            this.overlay.style.pointerEvents = 'none';
+            // Keep the guide and skip button interactive
+            const guide = this.overlay.querySelector('.tut-guide');
+            if (guide) guide.style.pointerEvents = 'auto';
+            this.skipBtn.style.pointerEvents = 'auto';
+          } else {
+            this.overlay.style.pointerEvents = '';
+          }
           const guide = this.overlay.querySelector('.tut-guide');
           if (guide) { guide.style.animation = 'none'; guide.offsetHeight; guide.style.animation = ''; }
           this.gestureHoldStart = 0;
@@ -5091,6 +5124,16 @@
         advance() {
           if (this.advancing) return;
           this.advancing = true;
+          const steps = this.steps[this.currentFlow];
+          const step = steps ? steps[this.currentStep] : null;
+          // If this step has a custom onAdvance callback, run it instead of normal advance
+          if (step && step.onAdvance) {
+            this.overlay.classList.remove('tut-active');
+            this.overlay.style.pointerEvents = '';
+            this.currentFlow = null;
+            step.onAdvance();
+            return;
+          }
           this.currentStep++;
           if (this.currentStep >= this.totalSteps) { this.finish(); }
           else { this.showStep(this.currentStep); }
@@ -5099,6 +5142,7 @@
         finish() {
           if (!this.overlay) return;
           this.overlay.classList.remove('tut-active');
+          this.overlay.style.pointerEvents = '';
           this.currentFlow = null;
         },
 
@@ -5175,7 +5219,7 @@
           currentTabPlayer = 1;
           ChordGlyphRenderer.clear();
           SoloAccompMode.activate();
-          if (window.TutorialSystem) {
+          if (window.TutorialSystem && !window._skipSoloTutorialAutoLaunch) {
             setTimeout(() => window.TutorialSystem.start('solo'), 400);
           }
         }
