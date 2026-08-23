@@ -4964,14 +4964,28 @@
               allowInteraction: true
             },
             {
-              text: '<strong>\u270b Open palm</strong> = smooth <strong>Glissando</strong> (sliding notes)<br><strong>\ud83d\udc4a Closed fist</strong> = crisp <strong>Legato</strong> (discrete notes)<br>Try switching between them!',
-              hint: '\u270b \u2192 \ud83d\udc4a', hintLabel: 'Palm vs Fist', btn: 'Got it \u2192'
+              text: 'Nice! Now let\'s check out <strong style="color:#e2c87e">Collab</strong> mode \ud83d\udc6b',
+              hint: '\ud83c\udfb5', hintLabel: '', btn: 'Let\'s see! \u2192', final: true,
+              onAdvance: function() {
+                window._skipCollabTutorialAutoLaunch = true;
+                const btn = document.getElementById('btn-mode-duo');
+                if (btn) btn.click();
+                setTimeout(() => {
+                  window._skipCollabTutorialAutoLaunch = false;
+                  if (window.TutorialSystem) window.TutorialSystem.start('collab');
+                }, 500);
+              }
+            }
+          ],
+          collab: [
+            {
+              text: 'This is <strong style="color:#e2c87e">Collab</strong> mode! \ud83d\udc6b<br>It\'s basically <strong>Single mode but with a friend!</strong><br>Each person uses their own pair of hands to play together.',
+              hint: '\ud83c\udfb6', hintLabel: '', btn: 'Cool! What\'s next? \u2192'
             },
             {
-              text: 'Nice! Now let\'s explore <strong style="color:#e2c87e">Solo & Accomp</strong> mode \ud83c\udfb6<br>Your hand <strong>becomes</strong> the instrument!',
+              text: 'Now let\'s explore <strong style="color:#e2c87e">Solo & Accomp</strong> mode \ud83c\udfb6<br>Your hand <strong>becomes</strong> the instrument!',
               hint: '\ud83c\udfb5', hintLabel: '', btn: 'Let\'s try it! \u2192', final: true,
               onAdvance: function() {
-                // Auto-switch to solo_accomp mode
                 window._skipSoloTutorialAutoLaunch = true;
                 const btn = document.getElementById('btn-mode-solo-accomp');
                 if (btn) btn.click();
@@ -5212,6 +5226,9 @@
           if (tabP2) tabP2.style.display = 'block';
           updateSoundControlsUI();
           ChordGlyphRenderer.clear();
+          if (window.TutorialSystem && !window._skipCollabTutorialAutoLaunch) {
+            setTimeout(() => window.TutorialSystem.start('collab'), 400);
+          }
         } else if (mode === 'solo_accomp') {
           btnSoloAccomp?.classList.add('active');
           document.body.classList.add('mode-solo-accomp');
