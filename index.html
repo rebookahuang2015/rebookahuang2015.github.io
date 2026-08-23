@@ -1957,19 +1957,22 @@
         volume: -8
       }).connect(p1Panner);
 
+      // Woodwind — breathy, airy tone (flute/clarinet character)
+      // Chord voice: flute-like — sine osc, gentle FM, slow attack, vibrato
       p1Instruments.woodwind.chord = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 1.0, modulationIndex: 3.5,
-        oscillator: { type: 'triangle' }, modulation: { type: 'square' },
-        envelope: { attack: 0.12, decay: 0.6, sustain: 0.5, release: 1.2 },
-        modulationEnvelope: { attack: 0.14, decay: 0.5, sustain: 0.6, release: 1.8 },
-        volume: -5
+        maxPolyphony: 8, harmonicity: 2.0, modulationIndex: 1.2,
+        oscillator: { type: 'sine' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.18, decay: 0.4, sustain: 0.65, release: 1.6 },
+        modulationEnvelope: { attack: 0.3, decay: 0.8, sustain: 0.3, release: 2.0 },
+        volume: -4
       }).connect(p1Panner);
+      // Arp voice: oboe/clarinet-like — odd harmonics via 3:1 ratio, brighter
       p1Instruments.woodwind.arp = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 1.5, modulationIndex: 4.5,
-        oscillator: { type: 'triangle' }, modulation: { type: 'square' },
-        envelope: { attack: 0.02, decay: 0.25, sustain: 0.3, release: 0.6 },
-        modulationEnvelope: { attack: 0.03, decay: 0.2, sustain: 0.4, release: 1.0 },
-        volume: -7
+        maxPolyphony: 8, harmonicity: 3.0, modulationIndex: 1.8,
+        oscillator: { type: 'sine' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.08, decay: 0.2, sustain: 0.5, release: 0.9 },
+        modulationEnvelope: { attack: 0.1, decay: 0.35, sustain: 0.25, release: 1.2 },
+        volume: -6
       }).connect(p1Panner);
 
       // ── Player 2 Instrument Bank ──
@@ -1999,19 +2002,20 @@
         volume: -8
       }).connect(p2Panner);
 
+      // Woodwind P2 — same design as P1
       p2Instruments.woodwind.chord = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 1.0, modulationIndex: 3.5,
-        oscillator: { type: 'triangle' }, modulation: { type: 'square' },
-        envelope: { attack: 0.12, decay: 0.6, sustain: 0.5, release: 1.2 },
-        modulationEnvelope: { attack: 0.14, decay: 0.5, sustain: 0.6, release: 1.8 },
-        volume: -5
+        maxPolyphony: 8, harmonicity: 2.0, modulationIndex: 1.2,
+        oscillator: { type: 'sine' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.18, decay: 0.4, sustain: 0.65, release: 1.6 },
+        modulationEnvelope: { attack: 0.3, decay: 0.8, sustain: 0.3, release: 2.0 },
+        volume: -4
       }).connect(p2Panner);
       p2Instruments.woodwind.arp = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 1.5, modulationIndex: 4.5,
-        oscillator: { type: 'triangle' }, modulation: { type: 'square' },
-        envelope: { attack: 0.02, decay: 0.25, sustain: 0.3, release: 0.6 },
-        modulationEnvelope: { attack: 0.03, decay: 0.2, sustain: 0.4, release: 1.0 },
-        volume: -7
+        maxPolyphony: 8, harmonicity: 3.0, modulationIndex: 1.8,
+        oscillator: { type: 'sine' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.08, decay: 0.2, sustain: 0.5, release: 0.9 },
+        modulationEnvelope: { attack: 0.1, decay: 0.35, sustain: 0.25, release: 1.2 },
+        volume: -6
       }).connect(p2Panner);
 
       setTimbre(1, p1Dsp.timbre);
