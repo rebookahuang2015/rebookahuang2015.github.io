@@ -1655,9 +1655,15 @@
     function fingerCurled(lm, tip, pip) { return !fingerExtended(lm, tip, pip); }
 
     function thumbOut(lm, label) {
+      if (!lm || !lm[LM.THUMB_TIP] || !lm[LM.THUMB_IP] || !lm[LM.WRIST] || !lm[LM.INDEX_MCP]) return false;
+      const handScale = d(lm[LM.WRIST], lm[LM.MIDDLE_MCP]);
+      const scale = handScale > 0.01 ? handScale : 1.0;
+      const thumbIdxMCPDist = d(lm[LM.THUMB_TIP], lm[LM.INDEX_MCP]) / scale;
+      if (thumbIdxMCPDist > 0.55) return true;
+
       const tip = lm[LM.THUMB_TIP], ip = lm[LM.THUMB_IP];
-      if (!tip || !ip) return false;
-      return label === 'Left' ? (tip.x > ip.x + 0.015) : (tip.x < ip.x - 0.015);
+      const dx = Math.abs(tip.x - ip.x);
+      return dx > 0.015;
     }
 
     function getFingerBits(lm, label) {
@@ -1719,9 +1725,15 @@
     }
 
     function thumbOut(lm, label) {
+      if (!lm || !lm[LM.THUMB_TIP] || !lm[LM.THUMB_IP] || !lm[LM.WRIST] || !lm[LM.INDEX_MCP]) return false;
+      const handScale = d(lm[LM.WRIST], lm[LM.MIDDLE_MCP]);
+      const scale = handScale > 0.01 ? handScale : 1.0;
+      const thumbIdxMCPDist = d(lm[LM.THUMB_TIP], lm[LM.INDEX_MCP]) / scale;
+      if (thumbIdxMCPDist > 0.55) return true;
+
       const tip = lm[LM.THUMB_TIP], ip = lm[LM.THUMB_IP];
-      if (!tip || !ip) return false;
-      return label === 'Left' ? (tip.x > ip.x + 0.015) : (tip.x < ip.x - 0.015);
+      const dx = Math.abs(tip.x - ip.x);
+      return dx > 0.015;
     }
 
     // Strict Left-Hand Gesture detection (returns C, D, E, F, G, A, B, or Stop)
@@ -1744,31 +1756,34 @@
       const t_p = d(lm[LM.THUMB_TIP], lm[LM.PINKY_TIP]) / scale;
       if (t_i < 0.42 && t_m < 0.42 && t_r < 0.42 && t_p < 0.42) return 'C5';
 
-      const thumbIdxDistNorm = d(lm[LM.THUMB_TIP], lm[LM.INDEX_TIP]) / scale;
-      const idxTipToMCPNorm = d(lm[LM.INDEX_TIP], lm[LM.INDEX_MCP]) / scale;
+      const thumbIdxTipDistNorm = d(lm[LM.THUMB_TIP], lm[LM.INDEX_TIP]) / scale;
+      const thumbIdxDIPDistNorm = d(lm[LM.THUMB_TIP], lm[LM.INDEX_DIP]) / scale;
       const thumbIdxMCPDistNorm = d(lm[LM.THUMB_TIP], lm[LM.INDEX_MCP]) / scale;
 
-      // 1. 👌 E — OK hand: thumb+index touching, others EXTENDED
-      if (thumbIdxDistNorm < 0.5 && midE && rngE && pnkE) return 'E';
+      const thumbIdxClose = (thumbIdxTipDistNorm < 0.60) || (thumbIdxDIPDistNorm < 0.50);
+      const thmOutOrWide = thmE || (thumbIdxMCPDistNorm > 0.55);
+      const otherCurledCount = (midC ? 1 : 0) + (rngC ? 1 : 0) + (pnkC ? 1 : 0);
 
-      // 2. 🫰 C — Finger heart: thumb+index touching, others CURLED
-      if (thumbIdxDistNorm < 0.5 && midC && rngC && pnkC && idxTipToMCPNorm > 0.4) return 'C';
+      // 1. 👌 E — OK hand: thumb+index touching, middle/ring/pinky extended
+      if (thumbIdxClose && midE && rngE && pnkE) return 'E';
 
-      // 3. 👊 Stop — Fist: all fingers curled tightly
-      if (!idxE && midC && rngC && pnkC && idxTipToMCPNorm <= 0.4) return 'Stop';
+      // 2. 🫰 C — Finger heart: thumb+index touching/crossing, other fingers curled
+      if (thumbIdxClose && otherCurledCount >= 2) return 'C';
+
+      // 3. 👊 Stop — Fist: all fingers curled tightly, thumb not forming finger heart with index
+      if (!idxE && midC && rngC && pnkC && !thumbIdxClose) return 'Stop';
 
       // 4. 🤟 F — ILY: thumb+index+pinky extended, middle+ring curled
-      if (thmE && idxE && pnkE && midC && rngC) return 'F';
+      if (thmOutOrWide && idxE && pnkE && midC && rngC) return 'F';
 
       // 5. 🤙 A — Shaka: thumb+pinky extended, index/mid/ring curled
-      const thumbWide = thumbIdxMCPDistNorm > 0.65;
-      if ((thmE || thumbWide) && pnkE && !idxE && midC && rngC) return 'A';
+      if (thmOutOrWide && pnkE && !idxE && midC && rngC) return 'A';
 
       // 6. ✌️ D — Peace: index+middle extended, ring+pinky curled
       if (idxE && midE && rngC && pnkC) return 'D';
 
       // 7. ☝️ B — Point up: only index extended, index and thumb not touching
-      if (idxE && midC && rngC && pnkC && thumbIdxDistNorm > 0.55) return 'B';
+      if (idxE && midC && rngC && pnkC && !thumbIdxClose) return 'B';
 
       // 8. ✋ G — Open palm: all 4 fingers extended
       if (idxE && midE && rngE && pnkE) return 'G';
