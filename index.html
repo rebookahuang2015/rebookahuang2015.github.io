@@ -2,9 +2,80 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0a0b">
   <title>Gesture Symphony — Two-Player Collaborative Chord Synthesizer</title>
   <meta name="description" content="Real-time multi-person collaborative hand gesture to musical chord synthesizer using MediaPipe and Tone.js">
+
+  <!-- Performance tier detection: runs before CSS so the right styles apply on first paint -->
+  <script>
+    (function () {
+      var ua = navigator.userAgent;
+      var touchPoints = navigator.maxTouchPoints || 0;
+      var phoneUA = /iPhone|iPod|Android.*Mobile|Mobile.*Firefox|Windows Phone/.test(ua);
+      var isIPad = !phoneUA && (/iPad/.test(ua) || (navigator.platform === 'MacIntel' && touchPoints > 1));
+      var shortSide = Math.min(screen.width, screen.height);
+      var isPhone = !isIPad && (phoneUA || (touchPoints > 0 && shortSide < 600));
+      var isTouch = touchPoints > 0;
+      var cores = navigator.hardwareConcurrency || 4;
+      var mem = navigator.deviceMemory || 8; // Safari doesn't report this
+
+      var auto;
+      if (isPhone) auto = 'low';
+      else if (isIPad || isTouch) auto = 'medium';
+      else if (cores <= 4 || mem <= 4) auto = 'medium';
+      else auto = 'high';
+
+      var saved = null;
+      try { saved = localStorage.getItem('gs_perf_tier'); } catch (e) {}
+      var manual = !!(saved && saved !== 'auto');
+      var tier = manual ? saved : auto;
+
+      var TIERS = {
+        high:   { shadowScale: 1.0, mists: 8, poly: 8, camW: 640, camH: 480, reverbScale: 1.0 },
+        medium: { shadowScale: 0.5, mists: 5, poly: 8, camW: 640, camH: 480, reverbScale: 0.8 },
+        low:    { shadowScale: 0.0, mists: 3, poly: 6, camW: 480, camH: 360, reverbScale: 0.6 }
+      };
+      if (!TIERS[tier]) tier = auto;
+
+      var html = document.documentElement;
+      window.PERF = Object.assign({ tier: tier, auto: auto, manual: manual, isPhone: isPhone, isIPad: isIPad, isTouch: isTouch }, TIERS[tier]);
+      html.classList.add('tier-' + tier);
+      if (isPhone) html.classList.add('is-phone');
+      if (isIPad) html.classList.add('is-ipad');
+      if (isTouch) html.classList.add('is-touch');
+
+      // Switch tier live (CSS + canvas effects). Camera size and synth voices apply on next load.
+      window.applyPerfTier = function (t) {
+        if (!TIERS[t]) return;
+        html.classList.remove('tier-high', 'tier-medium', 'tier-low');
+        html.classList.add('tier-' + t);
+        Object.assign(window.PERF, TIERS[t], { tier: t });
+        if (typeof window.onPerfTierChange === 'function') window.onPerfTierChange(t);
+      };
+      window.setPerfTier = function (choice) {
+        try { localStorage.setItem('gs_perf_tier', choice); } catch (e) {}
+        window.PERF.manual = choice !== 'auto';
+        window.applyPerfTier(choice === 'auto' ? auto : choice);
+      };
+
+      // Canvas glow (shadowBlur) is very expensive on phone GPUs — scale it by tier.
+      try {
+        var proto = CanvasRenderingContext2D.prototype;
+        var desc = Object.getOwnPropertyDescriptor(proto, 'shadowBlur');
+        if (desc && desc.set && desc.get) {
+          Object.defineProperty(proto, 'shadowBlur', {
+            configurable: true,
+            get: function () { return desc.get.call(this); },
+            set: function (v) { desc.set.call(this, v * window.PERF.shadowScale); }
+          });
+        }
+      } catch (e) {}
+    })();
+  </script>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -803,8 +874,156 @@
       .chord-label { font-size: 44px; bottom: 120px; }
       .chord-label.p1 { left: 20px; }
       .chord-label.p2 { right: 20px; }
-      #sound-controls { width: 340px; display: none; } /* hide sound controls on small screens for visual layout */
+      #sound-controls { width: 340px; }
     }
+
+    /* ============================================================
+       PERFORMANCE TIERS (set on <html> by the detection script)
+       ============================================================ */
+    /* Medium: no per-card blur (there are 18+ of them), lighter blur on big panels */
+    html.tier-medium .gesture-card,
+    html.tier-medium .toolbar-chip {
+      backdrop-filter: none; -webkit-backdrop-filter: none;
+      background: rgba(18,18,24,0.84);
+    }
+    html.tier-medium .hud-panel, html.tier-medium .chord-toolbar,
+    html.tier-medium #mode-selector-container, html.tier-medium #sound-controls,
+    html.tier-medium #solo-accomp-hud, html.tier-medium .tut-bubble,
+    html.tier-medium .dcg-panel, html.tier-medium .dcg-toggle, html.tier-medium #scoreboard {
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    }
+    html.tier-medium .amb-center-glow { filter: blur(36px); }
+
+    /* Low: no live blur at all — solid frosted panels instead */
+    html.tier-low *, html.tier-low *::before, html.tier-low *::after {
+      backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+    }
+    html.tier-low .gesture-card, html.tier-low .toolbar-chip, html.tier-low .hud-panel { background: rgba(20,20,28,0.9); }
+    html.tier-low .chord-toolbar { background: rgba(16,16,24,0.88); }
+    html.tier-low #mode-selector-container { background: rgba(14,14,22,0.94); }
+    html.tier-low #sound-controls { background: rgba(14,14,22,0.96); }
+    html.tier-low #solo-accomp-hud { background: rgba(10,10,18,0.94); }
+    html.tier-low .tut-bubble { background: rgba(32,30,42,0.95); }
+    html.tier-low .dcg-panel, html.tier-low .dcg-toggle, html.tier-low #scoreboard { background: rgba(16,16,24,0.95); }
+    html.tier-low #single-ambient-bg { display: none !important; }
+    html.tier-low .pie-wheel-svg, html.tier-low .gesture-emoji { filter: none; }
+    html.tier-low .landing-title { animation: none; filter: drop-shadow(0 0 18px rgba(226,200,126,0.4)); }
+
+    /* ============================================================
+       TOUCH DEVICES
+       ============================================================ */
+    html.is-touch, html.is-touch body {
+      overscroll-behavior: none;
+      -webkit-user-select: none; user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html.is-touch .pie-wheel-svg, html.is-touch .chord-toolbar { touch-action: none; }
+    html.is-touch .toolbar-chip { min-height: 32px; }
+
+    /* Phones: Collab needs 4 hands on camera — keep it for iPad/laptop */
+    html.is-phone #btn-mode-duo { display: none !important; }
+
+    /* ============================================================
+       COMPACT LAYOUT — phones in landscape & other short screens
+       ============================================================ */
+    @media (max-height: 520px) {
+      html .panel-header { font-size: 8px; margin-bottom: 4px; letter-spacing: 1.5px; }
+
+      /* Root note list → slim emoji strip */
+      html .left-panel { top: 50%; }
+      html .left-panel.p1 { left: max(8px, env(safe-area-inset-left)); }
+      html .left-panel.p2 { right: max(8px, env(safe-area-inset-right)); }
+      html .gesture-list { gap: 2px; }
+      html .gesture-card { padding: 3px 8px; min-width: 0; gap: 6px; border-radius: 8px; }
+      html .gesture-emoji { font-size: 14px; }
+      html .gesture-label { font-size: 10px; }
+
+      /* Pie wheel scaled to fit (hit-test scales with it in JS) */
+      html .pie-wheel-wrapper { width: min(210px, 52vh); height: min(210px, 52vh); }
+      html .chord-toolbar { max-width: 250px; gap: 4px; padding: 5px 6px; margin-top: 4px; }
+      html .chord-toolbar .toolbar-chip { padding: 3px 7px; font-size: 10px; min-height: 26px; gap: 4px; }
+      html .toolbar-chip .chip-emoji { font-size: 11px; }
+      html .toolbar-chip .chip-label { font-size: 10px; }
+      html .chord-toolbar .toolbar-label { font-size: 8px; margin-bottom: 2px; }
+      html body.mode-single #p1-right-panel { left: auto; right: max(12px, env(safe-area-inset-right)); }
+      html .right-panel.p1 { left: calc(25vw - 115px); }
+      html .right-panel.p2 { left: calc(75vw - 115px); }
+
+      /* Top bar */
+      html #mode-selector-container { top: max(6px, env(safe-area-inset-top)); padding: 4px; gap: 4px; border-radius: 14px; }
+      html .mode-btn { padding: 5px 10px; font-size: 9px; letter-spacing: 1px; border-radius: 10px; }
+      html #single-header, html #single-bottom-hint { display: none !important; }
+
+      /* Centre glyph */
+      html #chord-glyph-container { width: min(180px, 42vh); height: min(180px, 42vh); }
+      html #chord-name-display { transform: translate(-50%, min(78px, 20vh)); }
+      html #chord-name-display .chord-text { font-size: 15px; }
+
+      /* HUDs & labels */
+      html .hud-panel { top: 44px; min-width: 130px; padding: 6px 10px; font-size: 11px; }
+      html .chord-label { font-size: 30px; bottom: 56px; }
+      html #solo-accomp-hud { min-width: 0; width: min(380px, 70vw); padding: 8px 14px 6px; bottom: max(8px, env(safe-area-inset-bottom)); }
+
+      /* Sound settings: compact sheet at the bottom centre, starts collapsed */
+      html #sound-controls {
+        left: 50%; right: auto; bottom: max(6px, env(safe-area-inset-bottom));
+        transform: translateX(-50%);
+        width: min(300px, 36vw); max-width: none;
+      }
+      html #sound-controls:has(.sc-body:not(.collapsed)) { width: min(380px, calc(100vw - 24px)); z-index: 40; }
+      html #sound-controls .sc-header { padding-top: 6px; padding-bottom: 6px; }
+      html .sc-tabs:has(+ .sc-body.collapsed) { display: none; }
+      html .sc-body { max-height: calc(100vh - 110px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+      /* Tutorial */
+      html .tut-guide { bottom: max(10px, env(safe-area-inset-bottom)); left: max(10px, env(safe-area-inset-left)); gap: 8px; }
+      html .tut-mascot { transform: scale(0.7); transform-origin: bottom left; width: 50px; height: 50px; }
+      html .tut-bubble { padding: 10px 14px; min-width: 0; max-width: min(380px, calc(100vw - 110px)); }
+      html .tut-bubble-text { font-size: 12px; line-height: 1.45; }
+      html .tut-hint-emoji { font-size: 44px; }
+      html .tut-skip { top: max(8px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); }
+
+      /* Landing page */
+      html .landing-title-top { font-size: clamp(1.6rem, 9vh, 3.2rem); }
+      html .landing-title-bottom { font-size: clamp(2.8rem, 21vh, 6rem); }
+      html .landing-divider { margin: 12px 0 10px; }
+      html .landing-credit { bottom: 34px; font-size: 0.8rem; }
+      html .landing-ornament { bottom: 14px; }
+    }
+
+    /* ============================================================
+       ROTATE PROMPT — phones held upright
+       ============================================================ */
+    #rotate-prompt {
+      position: fixed; inset: 0; z-index: 10001;
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; padding: 32px; text-align: center;
+      background: radial-gradient(ellipse 80% 60% at 50% 55%, #1a1508 0%, #0a0a0b 70%);
+      color: #f3e6bb;
+    }
+    @media (orientation: portrait) {
+      html.is-phone #rotate-prompt { display: flex; }
+    }
+    #rotate-prompt .rp-icon { font-size: 56px; animation: rpTurn 2.4s ease-in-out infinite; }
+    @keyframes rpTurn { 0%, 20% { transform: rotate(0deg); } 50%, 70% { transform: rotate(-90deg); } 100% { transform: rotate(0deg); } }
+    #rotate-prompt .rp-title { font-family: 'Marcellus', Georgia, serif; font-size: 22px; letter-spacing: 0.12em; text-transform: uppercase; color: #e2c87e; }
+    #rotate-prompt .rp-sub { font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 17px; color: rgba(226,200,126,0.72); max-width: 280px; }
+
+    /* Performance toggle buttons in sound settings */
+    .sc-perf-btn {
+      flex: 1; padding: 8px 6px;
+      background: rgba(30,30,40,0.6);
+      border: 1px solid rgba(255,255,255,0.06); border-radius: 10px;
+      color: rgba(255,255,255,0.45); font-family: inherit;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: all 0.25s ease; text-align: center; line-height: 1.3;
+    }
+    .sc-perf-btn small { font-size: 9px; font-weight: 400; opacity: 0.6; }
+    .sc-perf-btn.active {
+      background: rgba(201,168,76,0.22); border-color: rgba(226,200,126,0.5); color: #fff;
+    }
+    .sc-perf-btn:hover:not(.active) { background: rgba(40,40,55,0.7); border-color: rgba(255,255,255,0.1); }
     /* ---- Landing Page ---- */
     #loading-screen {
       position: fixed; inset: 0; z-index: 9999;
@@ -1093,6 +1312,13 @@
   <script src="libs/Tone.js"></script>
 </head>
 <body>
+  <!-- Rotate prompt (phones in portrait only, via CSS) -->
+  <div id="rotate-prompt">
+    <div class="rp-icon">📱</div>
+    <div class="rp-title">Rotate your phone</div>
+    <div class="rp-sub">Turn your phone sideways so there's room for both hands</div>
+  </div>
+
   <!-- Landing Page -->
   <div id="loading-screen">
     <div class="landing-vignette"></div>
@@ -1446,6 +1672,16 @@
             <span class="sc-adsr-label r">R</span>
           </div>
           <canvas id="adsr-canvas" width="160" height="100"></canvas>
+        </div>
+      </div>
+
+      <div class="sc-section">
+        <div class="sc-section-label">PERFORMANCE</div>
+        <div class="sc-timbre-group" id="perf-tier-group">
+          <button class="sc-perf-btn" data-tier="auto">Auto<br><small id="perf-auto-label">detected</small></button>
+          <button class="sc-perf-btn" data-tier="high">High<br><small>full effects</small></button>
+          <button class="sc-perf-btn" data-tier="medium">Balanced<br><small>lighter glass</small></button>
+          <button class="sc-perf-btn" data-tier="low">Fast<br><small>smoothest</small></button>
         </div>
       </div>
     </div>
@@ -1806,7 +2042,8 @@
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
       const dist = Math.hypot(tipX - cx, tipY - cy);
-      if (dist > POINT_HIT_RADIUS) return null;
+      const hitRadius = POINT_HIT_RADIUS * (rect.width / 340); // wheel is 340px on desktop, smaller on phones
+      if (dist > hitRadius) return null;
 
       // Angle-based segment detection (0°=top, clockwise)
       let angle = Math.atan2(tipX - cx, -(tipY - cy)) * 180 / Math.PI;
@@ -1925,7 +2162,7 @@
 
     function initAudio() {
       // ── Shared Bus ──
-      reverb  = new Tone.Reverb({ decay: 2.2, wet: reverbWet, preDelay: 0.01 });
+      reverb  = new Tone.Reverb({ decay: 2.2 * (window.PERF ? PERF.reverbScale : 1), wet: reverbWet, preDelay: 0.01 });
       vol     = new Tone.Volume(masterVolume);
       reverb.chain(vol, Tone.Destination);
 
@@ -1958,14 +2195,14 @@
       }).connect(p1Panner);
 
       p1Instruments.synth.chord = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 3.01, modulationIndex: 2.2,
+        maxPolyphony: (window.PERF ? PERF.poly : 8), harmonicity: 3.01, modulationIndex: 2.2,
         oscillator: { type: 'triangle' }, modulation: { type: 'sine' },
         envelope: { attack: 0.06, decay: 0.8, sustain: 0.5, release: 1.5 },
         modulationEnvelope: { attack: 0.08, decay: 0.7, sustain: 0.6, release: 2.0 },
         volume: -6
       }).connect(p1Panner);
       p1Instruments.synth.arp = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 2.0, modulationIndex: 2.5,
+        maxPolyphony: (window.PERF ? PERF.poly : 8), harmonicity: 2.0, modulationIndex: 2.5,
         oscillator: { type: 'triangle' }, modulation: { type: 'sine' },
         envelope: { attack: 0.01, decay: 0.35, sustain: 0.25, release: 0.8 },
         modulationEnvelope: { attack: 0.02, decay: 0.3, sustain: 0.4, release: 1.2 },
@@ -1975,7 +2212,7 @@
       // Woodwind — breathy, airy tone (flute/clarinet character)
       // Chord voice: flute-like — sine osc, gentle FM, slow attack, vibrato
       p1Instruments.woodwind.chord = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 2.0, modulationIndex: 1.2,
+        maxPolyphony: (window.PERF ? PERF.poly : 8), harmonicity: 2.0, modulationIndex: 1.2,
         oscillator: { type: 'sine' }, modulation: { type: 'sine' },
         envelope: { attack: 0.18, decay: 0.4, sustain: 0.65, release: 1.6 },
         modulationEnvelope: { attack: 0.3, decay: 0.8, sustain: 0.3, release: 2.0 },
@@ -1983,7 +2220,7 @@
       }).connect(p1Panner);
       // Arp voice: oboe/clarinet-like — odd harmonics via 3:1 ratio, brighter
       p1Instruments.woodwind.arp = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 3.0, modulationIndex: 1.8,
+        maxPolyphony: (window.PERF ? PERF.poly : 8), harmonicity: 3.0, modulationIndex: 1.8,
         oscillator: { type: 'sine' }, modulation: { type: 'sine' },
         envelope: { attack: 0.08, decay: 0.2, sustain: 0.5, release: 0.9 },
         modulationEnvelope: { attack: 0.1, decay: 0.35, sustain: 0.25, release: 1.2 },
@@ -2003,14 +2240,14 @@
       }).connect(p2Panner);
 
       p2Instruments.synth.chord = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 3.01, modulationIndex: 2.2,
+        maxPolyphony: (window.PERF ? PERF.poly : 8), harmonicity: 3.01, modulationIndex: 2.2,
         oscillator: { type: 'triangle' }, modulation: { type: 'sine' },
         envelope: { attack: 0.06, decay: 0.8, sustain: 0.5, release: 1.5 },
         modulationEnvelope: { attack: 0.08, decay: 0.7, sustain: 0.6, release: 2.0 },
         volume: -6
       }).connect(p2Panner);
       p2Instruments.synth.arp = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 2.0, modulationIndex: 2.5,
+        maxPolyphony: (window.PERF ? PERF.poly : 8), harmonicity: 2.0, modulationIndex: 2.5,
         oscillator: { type: 'triangle' }, modulation: { type: 'sine' },
         envelope: { attack: 0.01, decay: 0.35, sustain: 0.25, release: 0.8 },
         modulationEnvelope: { attack: 0.02, decay: 0.3, sustain: 0.4, release: 1.2 },
@@ -2019,14 +2256,14 @@
 
       // Woodwind P2 — same design as P1
       p2Instruments.woodwind.chord = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 2.0, modulationIndex: 1.2,
+        maxPolyphony: (window.PERF ? PERF.poly : 8), harmonicity: 2.0, modulationIndex: 1.2,
         oscillator: { type: 'sine' }, modulation: { type: 'sine' },
         envelope: { attack: 0.18, decay: 0.4, sustain: 0.65, release: 1.6 },
         modulationEnvelope: { attack: 0.3, decay: 0.8, sustain: 0.3, release: 2.0 },
         volume: -4
       }).connect(p2Panner);
       p2Instruments.woodwind.arp = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8, harmonicity: 3.0, modulationIndex: 1.8,
+        maxPolyphony: (window.PERF ? PERF.poly : 8), harmonicity: 3.0, modulationIndex: 1.8,
         oscillator: { type: 'sine' }, modulation: { type: 'sine' },
         envelope: { attack: 0.08, decay: 0.2, sustain: 0.5, release: 0.9 },
         modulationEnvelope: { attack: 0.1, decay: 0.35, sustain: 0.25, release: 1.2 },
@@ -2380,7 +2617,8 @@
 
       init() {
         this.mists = [];
-        for (let i = 0; i < 8; i++) {
+        const mistCount = window.PERF ? PERF.mists : 8;
+        for (let i = 0; i < mistCount; i++) {
           this.mists.push({
             x: Math.random() * canvas.width,
             y: canvas.height - 30 - Math.random() * 90,
@@ -3520,7 +3758,7 @@
         this.initialized = true;
 
         // Shared Reverb & Volume Bus
-        this.soloReverbNode = new Tone.Reverb({ decay: 3.2, wet: 0.28, preDelay: 0.01 });
+        this.soloReverbNode = new Tone.Reverb({ decay: 3.2 * (window.PERF ? PERF.reverbScale : 1), wet: 0.28, preDelay: 0.01 });
         this.soloMasterVol = new Tone.Volume(-4);
         this.soloReverbNode.chain(this.soloMasterVol, Tone.Destination);
 
@@ -4068,6 +4306,22 @@
         fps = frameTick;
         frameTick = 0;
         fpsLastSec = now;
+
+        // Auto-downgrade: if the device is struggling during the first ~12s, step down a tier
+        if (window.PERF && !PERF.manual && PERF.tier !== 'low') {
+          if (!window._perfWatchStart) { window._perfWatchStart = now; window._perfLowSecs = 0; }
+          const watched = now - window._perfWatchStart;
+          if (watched > 2500 && watched < 12000) {
+            window._perfLowSecs = fps < 15 ? window._perfLowSecs + 1 : 0;
+            if (window._perfLowSecs >= 3) {
+              const next = PERF.tier === 'high' ? 'medium' : 'low';
+              console.log(`[perf] ${fps} fps — stepping down to ${next}`);
+              window.applyPerfTier(next);
+              window._perfWatchStart = now; // give the new tier a fresh window
+              window._perfLowSecs = 0;
+            }
+          }
+        }
       }
 
       // Draw mirrored video background
@@ -4744,6 +4998,59 @@
           dragSource = null;
         });
 
+        // --- Touch fallback: drag a toolbar chip into the pie with a finger ---
+        toolbarEl.addEventListener('pointerdown', (e) => {
+          if (e.pointerType === 'mouse') return; // mouse uses native drag-and-drop above
+          const chip = e.target.closest('.toolbar-chip');
+          if (!chip) return;
+          const quality = chip.dataset.quality;
+          const startX = e.clientX, startY = e.clientY;
+          let ghost = null;
+
+          const overWheel = (x, y) => {
+            const r = wrapper.getBoundingClientRect();
+            return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+          };
+          const setHighlight = (on) => {
+            svgEl.querySelectorAll('.pie-segment-group').forEach(seg => seg.classList.toggle('drag-over', on));
+          };
+
+          const onMove = (ev) => {
+            const dx = ev.clientX - startX, dy = ev.clientY - startY;
+            if (!ghost && dx * dx + dy * dy > 64) {
+              ghost = chip.cloneNode(true);
+              ghost.style.cssText = 'position:fixed;z-index:10000;pointer-events:none;transform:translate(-50%,-50%) scale(1.1);opacity:0.92;box-shadow:0 8px 24px rgba(0,0,0,0.6);';
+              document.body.appendChild(ghost);
+              chip.classList.add('dragging');
+            }
+            if (ghost) {
+              ev.preventDefault();
+              ghost.style.left = ev.clientX + 'px';
+              ghost.style.top = ev.clientY + 'px';
+              setHighlight(overWheel(ev.clientX, ev.clientY));
+            }
+          };
+
+          const onUp = (ev) => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            window.removeEventListener('pointercancel', onUp);
+            chip.classList.remove('dragging');
+            setHighlight(false);
+            if (!ghost) return;
+            ghost.remove();
+            if (ev.type === 'pointerup' && overWheel(ev.clientX, ev.clientY) &&
+                !pieQualities.includes(quality) && pieQualities.length < 11) {
+              pieQualities.push(quality);
+              refresh();
+            }
+          };
+
+          window.addEventListener('pointermove', onMove, { passive: false });
+          window.addEventListener('pointerup', onUp);
+          window.addEventListener('pointercancel', onUp);
+        });
+
         // Initial build
         refresh();
       }
@@ -4878,24 +5185,64 @@
     }
 
     let mpHandsInstance = null;
+    let mpHandsReady = null;
 
-    function startCamera() {
+    // Create the hand tracker and start downloading its model. Safe to call before the user taps,
+    // so the (slow) model load overlaps with the landing page instead of happening after it.
+    function createHands() {
+      if (mpHandsInstance) return mpHandsReady;
       mpHandsInstance = new Hands({
         locateFile: f => `./libs/hands/${f}`
       });
       mpHandsInstance.setOptions({
-        maxNumHands: 2,
+        maxNumHands: playMode === 'duo' ? 4 : 2,
         modelComplexity: 0,
         minDetectionConfidence: 0.65,
         minTrackingConfidence: 0.5
       });
       mpHandsInstance.onResults(onResults);
+      mpHandsReady = (typeof mpHandsInstance.initialize === 'function')
+        ? mpHandsInstance.initialize().catch(e => console.warn('[hands] preload failed, will retry on first frame', e))
+        : Promise.resolve();
+      return mpHandsReady;
+    }
+
+    function setLandingStatus(text) {
+      const sub = document.getElementById('landing-sub');
+      if (sub) sub.textContent = text;
+    }
+
+    function startCamera() {
+      createHands();
 
       const cam = new Camera(videoEl, {
         onFrame: async () => { await mpHandsInstance.send({ image: videoEl }); },
-        width: 640, height: 480
+        width: window.PERF ? PERF.camW : 640,
+        height: window.PERF ? PERF.camH : 480
       });
-      cam.start();
+
+      const started = cam.start();
+      if (started && typeof started.catch === 'function') {
+        started.catch(err => {
+          console.error('Camera failed to start:', err);
+          const name = err && err.name;
+          if (name === 'NotAllowedError' || name === 'SecurityError') {
+            setLandingStatus('Camera blocked — allow camera access in your browser settings, then refresh');
+          } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+            setLandingStatus('No camera found on this device');
+          } else {
+            setLandingStatus('Could not start the camera — please refresh and try again');
+          }
+        });
+      }
+
+      // If nothing has arrived after a while, tell the user what's going on instead of hanging silently
+      setTimeout(() => {
+        if (!window._firstFrameReceived) setLandingStatus('Still starting… make sure you allowed camera access');
+      }, 12000);
+      setTimeout(() => {
+        if (!window._firstFrameReceived) setLandingStatus('This is taking a while — try refreshing, or close other tabs using the camera');
+      }, 30000);
     }
 
     (function init() {
@@ -4905,6 +5252,49 @@
       bindSoundControls();
       VFXShaderSystem.init();
       ChordGlyphRenderer.init();
+
+      // ---- Cross-device setup ----
+      // Performance toggle (Auto / High / Balanced / Fast)
+      const perfBtns = document.querySelectorAll('.sc-perf-btn');
+      const autoLabel = document.getElementById('perf-auto-label');
+      const TIER_NAMES = { high: 'High', medium: 'Balanced', low: 'Fast' };
+      const refreshPerfButtons = () => {
+        let choice = 'auto';
+        try { choice = localStorage.getItem('gs_perf_tier') || 'auto'; } catch (e) {}
+        perfBtns.forEach(b => b.classList.toggle('active', b.dataset.tier === choice));
+        if (autoLabel) autoLabel.textContent = 'now: ' + (TIER_NAMES[PERF.tier] || PERF.tier);
+      };
+      perfBtns.forEach(b => b.addEventListener('click', () => {
+        window.setPerfTier(b.dataset.tier);
+        refreshPerfButtons();
+      }));
+      // When the tier changes live, rebuild the canvas effects to match
+      window.onPerfTierChange = () => {
+        VFXShaderSystem.init();
+        refreshPerfButtons();
+      };
+      refreshPerfButtons();
+
+      // Short screens (phones in landscape): start with sound settings collapsed
+      if (window.innerHeight <= 520) {
+        document.getElementById('sc-body')?.classList.add('collapsed');
+      }
+
+      // iOS suspends audio when the tab is backgrounded or the screen locks — resume it
+      const resumeAudio = () => {
+        if (audioStarted && Tone.context.state !== 'running') Tone.context.resume().catch(() => {});
+      };
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) resumeAudio(); });
+      window.addEventListener('pageshow', resumeAudio);
+      document.addEventListener('touchend', resumeAudio, { passive: true });
+
+      // Recalculate layout after rotating a phone/iPad
+      window.addEventListener('orientationchange', () => setTimeout(resize, 300));
+
+      // Start downloading the hand-tracking model while the landing page is showing
+      setTimeout(() => {
+        try { createHands(); } catch (e) { console.warn('[hands] preload skipped', e); }
+      }, 400);
 
       // Mode Selector Button Handlers
       const btnSingle = document.getElementById('btn-mode-single');
@@ -4982,15 +5372,22 @@
               allowInteraction: true
             },
             {
-              text: 'Nice! Now let\'s check out <strong style="color:#e2c87e">Collab</strong> mode \ud83d\udc6b',
+              // Phones skip Collab (hidden there) and go straight to Solo & Accomp
+              get text() {
+                return (window.PERF && PERF.isPhone)
+                  ? 'Nice! Now let\'s explore <strong style="color:#e2c87e">Solo & Accomp</strong> mode \ud83c\udfb6<br>Your hand <strong>becomes</strong> the instrument!'
+                  : 'Nice! Now let\'s check out <strong style="color:#e2c87e">Collab</strong> mode \ud83d\udc6b';
+              },
               hint: '\ud83c\udfb5', hintLabel: '', btn: 'Let\'s see! \u2192', final: true,
               onAdvance: function() {
-                window._skipCollabTutorialAutoLaunch = true;
-                const btn = document.getElementById('btn-mode-duo');
+                const toSolo = window.PERF && PERF.isPhone;
+                const flag = toSolo ? '_skipSoloTutorialAutoLaunch' : '_skipCollabTutorialAutoLaunch';
+                window[flag] = true;
+                const btn = document.getElementById(toSolo ? 'btn-mode-solo-accomp' : 'btn-mode-duo');
                 if (btn) btn.click();
                 setTimeout(() => {
-                  window._skipCollabTutorialAutoLaunch = false;
-                  if (window.TutorialSystem) window.TutorialSystem.start('collab');
+                  window[flag] = false;
+                  if (window.TutorialSystem) window.TutorialSystem.start(toSolo ? 'solo' : 'collab');
                 }, 500);
               }
             }
