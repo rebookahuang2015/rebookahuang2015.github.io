@@ -923,6 +923,8 @@
 
     /* Phones: Collab needs 4 hands on camera — keep it for iPad/laptop */
     html.is-phone #btn-mode-duo { display: none !important; }
+    /* Phones: sound settings take up too much room on a small screen */
+    html.is-phone #sound-controls { display: none !important; }
 
     /* ============================================================
        COMPACT LAYOUT — phones in landscape & other short screens
@@ -1868,8 +1870,25 @@
     // 3. FINGER STATE CALCULATION
     // ===================================================================
     function d(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-    function scrX(x) { return (1 - x) * canvas.width; }
-    function scrY(y) { return y * canvas.height; }
+    // How the camera image maps onto the screen. On phones the image fills the screen at its
+    // natural proportions (edges cropped) instead of being stretched; other devices keep the
+    // original stretch-to-fill. Every landmark → screen conversion goes through scrX/scrY so
+    // the hand skeleton always lines up with the video.
+    const videoFit = { offX: 0, offY: 0, w: 0, h: 0 };
+    function updateVideoFit() {
+      const cw = canvas.width, ch = canvas.height;
+      const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+      if (!(window.PERF && PERF.isPhone) || !vw || !vh) {
+        videoFit.offX = 0; videoFit.offY = 0; videoFit.w = cw; videoFit.h = ch;
+        return;
+      }
+      const s = Math.max(cw / vw, ch / vh);
+      videoFit.w = vw * s; videoFit.h = vh * s;
+      videoFit.offX = (cw - videoFit.w) / 2;
+      videoFit.offY = (ch - videoFit.h) / 2;
+    }
+    function scrX(x) { return videoFit.offX + (1 - x) * videoFit.w; }
+    function scrY(y) { return videoFit.offY + y * videoFit.h; }
 
     // Guard: ensure all 21 landmarks are defined with x/y coords
     function isValidHand(lm) {
@@ -1945,8 +1964,7 @@
     }
 
     function d(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-    function scrX(x) { return (1 - x) * canvas.width; }
-    function scrY(y) { return y * canvas.height; }
+    // scrX / scrY are defined once above (shared camera-to-screen mapping)
 
     function fingerExtended(lm, tip, pip) {
       const w = lm[LM.WRIST];
@@ -2032,8 +2050,8 @@
       const idxE = fingerExtended(lm, LM.INDEX_TIP, LM.INDEX_PIP);
       if (!idxE) return null;
 
-      const tipX = (1 - lm[LM.INDEX_TIP].x) * canvas.width;
-      const tipY = lm[LM.INDEX_TIP].y * canvas.height;
+      const tipX = scrX(lm[LM.INDEX_TIP].x);
+      const tipY = scrY(lm[LM.INDEX_TIP].y);
 
       const wheelId = playerNum === 1 ? 'p1-pie-wheel' : 'p2-pie-wheel';
       const svgEl = document.getElementById(wheelId);
@@ -2526,8 +2544,8 @@
     }
 
     function drawPointerDot(lm, playerColor) {
-      const tipX = (1 - lm[LM.INDEX_TIP].x) * canvas.width;
-      const tipY = lm[LM.INDEX_TIP].y * canvas.height;
+      const tipX = scrX(lm[LM.INDEX_TIP].x);
+      const tipY = scrY(lm[LM.INDEX_TIP].y);
       ctx.fillStyle = playerColor === '#00ff88' ? 'rgba(0, 255, 136, 0.85)' : 'rgba(255, 110, 199, 0.85)';
       ctx.beginPath();
       ctx.arc(tipX, tipY, 7, 0, Math.PI * 2);
@@ -4084,8 +4102,8 @@
         this.mapZToReverb(hand);
 
         // Screen position
-        const tipX = mirroredX * canvas.width;
-        const tipY = wrist.y * canvas.height;
+        const tipX = videoFit.offX + mirroredX * videoFit.w;
+        const tipY = scrY(wrist.y);
 
         if (synth) {
           const SEMITONE = Math.pow(2, 1/12); // ~1.0595
@@ -4324,11 +4342,12 @@
         }
       }
 
-      // Draw mirrored video background
+      // Draw mirrored video background (proportions kept on phones — see updateVideoFit)
+      updateVideoFit();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
       ctx.scale(-1, 1);
-      ctx.drawImage(videoEl, -canvas.width, 0, canvas.width, canvas.height);
+      ctx.drawImage(videoEl, -(videoFit.offX + videoFit.w), videoFit.offY, videoFit.w, videoFit.h);
       ctx.restore();
 
 
@@ -5217,8 +5236,9 @@
 
       const cam = new Camera(videoEl, {
         onFrame: async () => { await mpHandsInstance.send({ image: videoEl }); },
-        width: window.PERF ? PERF.camW : 640,
-        height: window.PERF ? PERF.camH : 480
+        // Phones get a 16:9 feed so it fits the wide landscape screen with less cropping
+        width: (window.PERF && PERF.isPhone) ? 640 : (window.PERF ? PERF.camW : 640),
+        height: (window.PERF && PERF.isPhone) ? 360 : (window.PERF ? PERF.camH : 480)
       });
 
       const started = cam.start();
