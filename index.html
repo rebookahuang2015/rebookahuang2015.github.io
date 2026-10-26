@@ -1702,12 +1702,25 @@
        APPLICATION LOGIC
        ============================================================ -->
   <script>
+    // Log errors to the console instead of interrupting players with alert() pop-ups.
+    // If something fails while the landing page is still up, show a short note there.
+    function reportStartupProblem() {
+      const sub = document.getElementById('landing-sub');
+      const landing = document.getElementById('loading-screen');
+      let tapped = false;
+      try { tapped = audioStarted; } catch (e) {}
+      if (tapped && sub && landing && !landing.classList.contains('hidden') && !window._firstFrameReceived) {
+        sub.textContent = 'Something went wrong starting up — please refresh the page';
+      }
+    }
     window.onerror = function(message, source, lineno, colno, error) {
-      alert(`JS Error: ${message}\nLine: ${lineno}:${colno}\nSource: ${source}`);
+      console.error(`JS Error: ${message} (line ${lineno}:${colno}, ${source})`, error);
+      reportStartupProblem();
       return false;
     };
     window.onunhandledrejection = function(event) {
-      alert(`Unhandled Promise Rejection: ${event.reason}`);
+      console.error('Unhandled Promise Rejection:', event.reason);
+      reportStartupProblem();
     };
 
     // ===================================================================
@@ -5235,7 +5248,12 @@
       createHands();
 
       const cam = new Camera(videoEl, {
-        onFrame: async () => { await mpHandsInstance.send({ image: videoEl }); },
+        onFrame: async () => {
+          // Never send a frame while the preload is still initializing — a second, overlapping
+          // initialization crashes MediaPipe ("Module.arguments has been replaced", seen on iPhone).
+          if (mpHandsReady) await mpHandsReady;
+          await mpHandsInstance.send({ image: videoEl });
+        },
         // Phones get a 16:9 feed so it fits the wide landscape screen with less cropping
         width: (window.PERF && PERF.isPhone) ? 640 : (window.PERF ? PERF.camW : 640),
         height: (window.PERF && PERF.isPhone) ? 360 : (window.PERF ? PERF.camH : 480)
